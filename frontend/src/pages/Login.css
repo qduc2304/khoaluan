@@ -1,0 +1,52 @@
+.login-page-container {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  /* 
+    Lưu ý: Bạn nên thay thế URL này bằng một ảnh nền thực tế của trường Đại học Thái Bình.
+    Hãy đặt ảnh trong thư mục `public` và tham chiếu đến nó, ví dụ: url('/background-tbu.jpg')
+  */
+  background-image: url('https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=2070&auto=format&fit=crop');
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+/* Lớp phủ mờ màu đen giúp khung đăng nhập nổi bật hơn */
+.login-page-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 0;
+}
+
+.login-card {
+  width: 600px; /* Khung đăng nhập to hơn */
+  max-width: 95%;
+  padding: 40px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
+  z-index: 1; /* Hiển thị trên lớp phủ */
+  text-align: center;
+}
+
+.login-title-main {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1677ff; /* Màu xanh chính của Ant Design */
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.login-title-sub {
+  font-size: 16px;
+  color: #595959;
+  margin-bottom: 32px;
+}

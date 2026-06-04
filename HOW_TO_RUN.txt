@@ -1,0 +1,356 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║                    📖 HƯỚNG DẪN CHẠY TEST CHI TIẾT                       ║
+║                                                                            ║
+║                        (Bạn Có Thể Làm Trong 5 Phút)                      ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+
+🎯 MỤC ĐÍCH
+════════════════════════════════════════════════════════════════════════════
+Kiểm thử các API endpoint thực tế:
+- ✓ Đăng nhập (JWT token)
+- ✓ Lấy thông tin cá nhân
+- ✓ Danh sách giảng viên
+- ✓ Danh sách khoa
+- ✓ Kiểm tra quyền hạn
+
+
+🔧 CÁCH CHẠY - LỰA CHỌN 1 (DỄ NHẤT - Dùng Cmd/Terminal)
+════════════════════════════════════════════════════════════════════════════
+
+BƯỚC 1: Mở Terminal/CMD (2 cái)
+──────────────────────────────────────────────────────────────────────────
+  1. Nhấn: Windows Key + R
+  2. Gõ: cmd
+  3. Nhấn: Enter
+
+  Lặp lại để mở 2 CMD window
+
+
+BƯỚC 2: Terminal 1 - Khởi Động Backend Server
+──────────────────────────────────────────────────────────────────────────
+  Trong Terminal 1, gõ lần lượt:
+
+  cd d:\khoaluan\backend
+  
+  node server.js
+
+  
+  Kết quả sẽ hiện:
+  
+  ═══════════════════════════════════════
+  ✅ Đã kết nối thành công tới MySQL!
+  Backend Server đang chạy tại http://0.0.0.0:8080
+  ═══════════════════════════════════════
+
+  ⚠️ Hãy để Terminal 1 chạy, đừng đóng nó!
+
+
+BƯỚC 3: Terminal 2 - Chạy Test
+──────────────────────────────────────────────────────────────────────────
+  Trong Terminal 2, gõ lần lượt:
+
+  cd d:\khoaluan
+  
+  node test_real_api.js
+
+
+  Bạn sẽ thấy:
+  
+  ╔════════════════════════════════════════╗
+  ║   REAL API TESTING - Chạy Thực Tế     ║
+  ║ Backend must be running on :8080      ║
+  ╚════════════════════════════════════════╝
+  
+  ℹ Server is ready!
+  
+  ═══ TEST 1: Seed Admin Account ═══
+  → GET /api/auth/seed
+  ← 200 ...
+  ✓ Admin account seeded successfully
+  
+  ═══ TEST 2: Seed Sample Users ═══
+  ...
+  
+  (Tiếp tục với các tests khác)
+
+
+BƯỚC 4: Đợi Test Hoàn Thành
+──────────────────────────────────────────────────────────────────────────
+  Cuối cùng bạn sẽ thấy:
+  
+  ═══════════════════════════════════════
+  Result: 10 / 10 tests passed
+  ✓ All API tests passed!
+  ═══════════════════════════════════════
+
+
+🔧 CÁCH CHẠY - LỰA CHỌN 2 (Nếu không muốn khởi động backend riêng)
+════════════════════════════════════════════════════════════════════════════
+
+Chỉ chạy các test không cần backend:
+
+  cd d:\khoaluan
+
+  # Test 1: Xác thực & mã hóa (JWT, bcrypt)
+  node test_auth_logic.js
+
+  # Test 2: Liên kết dữ liệu (API integration)
+  node test_api_integration.js
+
+  # Test 3: Flow hoàn chỉnh (Mô phỏng)
+  node test_complete_flow.js
+
+  # Test 4: Toàn hệ thống (12 tests)
+  node test_system.js
+
+
+🔧 CÁCH CHẠY - LỰA CHỌN 3 (Batch file - Easiest for Windows)
+════════════════════════════════════════════════════════════════════════════
+
+BƯỚC 1: Double-click file start_server.bat
+────────────────────────────────────────────
+  Vị trí: d:\khoaluan\start_server.bat
+  
+  Hành động: Double-click → Backend tự khởi động
+
+
+BƯỚC 2: Mở CMD & chạy test
+──────────────────────────
+  Windows Key + R
+  Gõ: cmd
+  Nhấn: Enter
+  
+  Trong CMD:
+  cd d:\khoaluan
+  node test_real_api.js
+
+
+📊 EXPECTED OUTPUT (Bạn Sẽ Thấy Cái Này)
+════════════════════════════════════════════════════════════════════════════
+
+Khi chạy test_real_api.js:
+
+╔════════════════════════════════════════════╗
+║    REAL API TESTING - Chạy Thực Tế        ║
+║  Backend must be running on :8080         ║
+╚════════════════════════════════════════════╝
+
+Base URL: http://localhost:8080
+Please ensure backend server is running: node d:\khoaluan\backend\server.js
+
+. (waiting for server)
+
+✓ Server is ready!
+
+═══ TEST 1: Seed Admin Account (GET /api/auth/seed) ═══
+
+→ GET /api/auth/seed
+← 200 {"message":"Đã tạo tài khoản..."}
+✓ Admin account seeded successfully
+  Email: quantri@truong.vn
+  Password: 123456
+  Role: director
+
+═══ TEST 2: Seed Sample Users (GET /api/users/seed) ═══
+
+→ GET /api/users/seed
+← 200 {"message":"Đã cập nhật/tạo 5 tài khoản..."}
+✓ Sample users seeded successfully
+  Created 5 test accounts:
+    - ID 1: Giám Đốc (director)
+    - ID 2: Chuyên Viên (specialist)
+    - ID 3: Giảng Viên (instructor)
+    - ID 4: Sinh Viên (student)
+    - ID 5: Thành Viên Hội Đồng (council)
+
+═══ TEST 3: Login Admin (POST /api/auth/login) ═══
+
+→ POST /api/auth/login
+Body: {"email":"quantri@truong.vn","password":"123456"}
+← 200 Login successful
+✓ Admin login successful
+  Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+  User: Quản Trị Viên
+  Role: director
+
+═══ TEST SUMMARY ═══
+
+✓ Seed Admin
+✓ Seed Users
+✓ Login Admin
+✓ Get Profile
+✓ Get Instructors
+✓ Get Faculties
+✓ Get All Users
+✓ Invalid Token
+✓ Without Token
+
+═══════════════════════════════════════
+Result: 10 / 10 tests passed
+✓ All API tests passed!
+
+═══════════════════════════════════════
+
+
+🎨 MÀU SẮC CÓ NGHĨA GÌ?
+════════════════════════════════════════════════════════════════════════════
+
+✓ (xanh lá) = Test đã passed, thành công
+✗ (đỏ)     = Test failed, thất bại
+→ (xanh dương) = Request gửi đi
+← (xanh dương) = Response nhận về
+ℹ (xanh dương) = Thông tin
+
+Nếu bạn thấy toàn ✓ = Tất cả test passed = SUCCESS! 🎉
+
+
+❌ NẾUGAS LỖI
+════════════════════════════════════════════════════════════════════════════
+
+LỖI 1: "Cannot find module 'mysql2/promise'"
+────────────────────────────────────────────
+  Nguyên nhân: Dependencies chưa cài
+  Cách sửa:
+    cd d:\khoaluan\backend
+    npm install
+
+LỖI 2: "Port 8080 already in use"
+────────────────────────────────────
+  Nguyên nhân: Port 8080 đã bị chiếm
+  Cách sửa:
+    # Cmd mới
+    netstat -ano | findstr :8080
+    
+    # Kết quả sẽ hiện số process (ví dụ: 1234)
+    taskkill /PID 1234 /F
+    
+    # Rồi chạy lại backend
+
+LỖI 3: "Cannot find ca.pem"
+────────────────────────────
+  Nguyên nhân: SSL certificate không có
+  Cách sửa:
+    1. Download ca.pem từ Aiven Dashboard
+    2. Đặt vào: d:\khoaluan\backend\ca.pem
+
+LỖI 4: "ECONNREFUSED"
+─────────────────────
+  Nguyên nhân: Backend không chạy
+  Cách sửa:
+    Hãy chắc chắn rằng Terminal 1 đang chạy:
+    cd d:\khoaluan\backend && node server.js
+
+LỖI 5: "Invalid token"
+──────────────────────
+  Nguyên nhân: JWT_SECRET không đúng
+  Cách sửa:
+    Kiểm tra file .env trong d:\khoaluan\backend\
+
+
+📋 KIỂM TRA TRƯỚC KHI CHẠY
+════════════════════════════════════════════════════════════════════════════
+
+✓ Node.js đã cài chưa?
+  Gõ: node --version
+  Kết quả: v18.x.x hoặc cao hơn
+
+✓ npm đã cài chưa?
+  Gõ: npm --version
+  Kết quả: 9.x.x hoặc cao hơn
+
+✓ Dependencies cài đặt?
+  cd d:\khoaluan\backend
+  npm install
+
+✓ .env file có không?
+  Mở: d:\khoaluan\backend\.env
+  Kiểm tra các giá trị DB_*
+
+✓ ca.pem certificate có không?
+  File: d:\khoaluan\backend\ca.pem
+  Nếu không có: Download từ Aiven Dashboard
+
+
+🎓 THỨ TỰ CHẠY ĐƯỢC ĐỀ XUẤT
+════════════════════════════════════════════════════════════════════════════
+
+Nếu này là lần đầu tiên:
+
+1️⃣  TRƯỚC TIÊN: Chạy test không cần backend
+    cd d:\khoaluan
+    node test_auth_logic.js
+
+    Kết quả: Xanh lá tất cả = OK ✓
+
+2️⃣  TIẾP THEO: Chạy test API integration
+    node test_api_integration.js
+
+    Kết quả: Xanh lá tất cả = OK ✓
+
+3️⃣  RỒI SAU: Khởi động backend
+    cd d:\khoaluan\backend
+    node server.js
+
+    Kết quả: "Backend Server đang chạy..."
+
+4️⃣  CUỐI CÙNG: Chạy real API test (Terminal 2)
+    cd d:\khoaluan
+    node test_real_api.js
+
+    Kết quả: 10/10 tests passed = SUCCESS! 🎉
+
+
+🏁 HOÀN THÀNH!
+════════════════════════════════════════════════════════════════════════════
+
+Khi tất cả tests đều ✓ xanh lá:
+
+✅ System bạn đã ready
+✅ Database connected
+✅ Authentication working
+✅ API endpoints verified
+✅ Data integrity verified
+
+→ Bạn có thể deploy với tự tin!
+
+
+📞 CẦN GIÚP?
+════════════════════════════════════════════════════════════════════════════
+
+1. Bước nào không hiểu → Xem lại phần trên
+2. Có lỗi → Tìm trong mục "NẾUGAS LỖI"
+3. Vẫn không được → Đọc file:
+   - README_TESTS.md
+   - RUN_API_TESTS.md
+   - TEST_REPORT.md
+
+
+✨ TIPS
+════════════════════════════════════════════════════════════════════════════
+
+1. Để Terminal 1 (backend) chạy cả khi chạy test
+   → Đừng đóng Terminal 1
+   → Mở Terminal 2 mới để chạy test
+
+2. Nếu muốn xem database trực tiếp
+   cd d:\khoaluan
+   node check_users.js
+
+3. Nếu muốn stop backend
+   → Nhấn: Ctrl + C trong Terminal 1
+
+4. Có thể chạy lại test bao nhiêu lần tùy ý
+   → Chỉ cần chắc backend vẫn running
+
+
+════════════════════════════════════════════════════════════════════════════
+
+🚀 READY? LET'S GO!
+
+Bạn đã sẵn sàng chạy test chưa?
+Hãy bắt đầu bằng BƯỚC 1 (Terminal 1) ở trên!
+
+════════════════════════════════════════════════════════════════════════════

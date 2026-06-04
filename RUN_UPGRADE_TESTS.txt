@@ -1,0 +1,321 @@
+═══════════════════════════════════════════════════════════════════════════════
+  🧪 HƯỚNG DẪN CHẠY TEST - UPGRADE LOGIC VERIFICATION
+═══════════════════════════════════════════════════════════════════════════════
+
+Sau khi hoàn tất upgrade logic, bạn có thể chạy các test để kiểm tra.
+
+═══════════════════════════════════════════════════════════════════════════════
+📋 QUICK START - Chạy test nhanh (2 phút)
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Kiểm tra tất cả file được tạo/sửa:
+   ─────────────────────────────────────
+   cd d:\khoaluan
+   node VERIFY_UPGRADE.js
+   
+   Kết quả dự kiến: ✅ ALL VERIFICATION CHECKS PASSED
+
+2. Test nhanh validators:
+   ─────────────────────────────────────
+   node test_validators_quick.js
+   
+   Kết quả dự kiến: 25/25 tests passed ✓
+
+3. Test authentication logic:
+   ─────────────────────────────────────
+   node test_auth_improvements.js
+   
+   Kết quả dự kiến: 12+ tests passed ✓
+
+═══════════════════════════════════════════════════════════════════════════════
+🧬 COMPREHENSIVE TEST - Toàn bộ kiểm tra (5 phút)
+═══════════════════════════════════════════════════════════════════════════════
+
+Chạy test suite toàn diện (50+ test cases):
+
+   cd d:\khoaluan
+   node test_comprehensive_upgrade.js
+   
+   Kết quả dự kiến:
+   ✓ 50+ tests passed
+   ✓ Success Rate: 100%
+   ✓ All validation working correctly
+
+═══════════════════════════════════════════════════════════════════════════════
+🔒 INTEGRATION TEST - Kiểm tra với server thực (10 phút)
+═══════════════════════════════════════════════════════════════════════════════
+
+Test với server Express thực tế:
+
+Terminal 1 - Khởi động backend:
+   ─────────────────────────────
+   cd d:\khoaluan\backend
+   node server.js
+   
+   Dự kiến output:
+   ✅ Đã kết nối thành công tới MySQL trên Aiven!
+   Backend Server đang chạy tại http://0.0.0.0:8080
+
+Terminal 2 - Chạy integration tests:
+   ─────────────────────────────────
+   cd d:\khoaluan
+   node test_real_api.js
+   
+   Kết quả dự kiến: 10+ API endpoints tested ✓
+
+═══════════════════════════════════════════════════════════════════════════════
+✅ TEST CÁC CẢI TIẾN CỤ THỂ
+═══════════════════════════════════════════════════════════════════════════════
+
+1. EMAIL VALIDATION
+   Test Input: invalid-email
+   Expected: ❌ REJECTED (not valid email format)
+   
+   Test Input: user@example.com
+   Expected: ✅ ACCEPTED
+
+2. PASSWORD STRENGTH
+   Test Input: 12345 (5 chars)
+   Expected: ❌ REJECTED (< 6 chars)
+   
+   Test Input: 123456 (6 chars)
+   Expected: ✅ ACCEPTED
+
+3. FACULTY VALIDATION
+   Test Input: "Invalid Faculty"
+   Expected: ❌ REJECTED (not in TBU list)
+   
+   Test Input: "Khoa Công nghệ và Kỹ thuật"
+   Expected: ✅ ACCEPTED
+
+4. SCORE VALIDATION
+   Test Input: 150
+   Expected: ❌ REJECTED (> 100)
+   
+   Test Input: 75
+   Expected: ✅ ACCEPTED
+
+5. TOKEN EXPIRATION
+   Test Input: Expired token
+   Expected: ❌ REJECTED with code: TOKEN_EXPIRED
+   
+   Test Input: Valid fresh token
+   Expected: ✅ ACCEPTED
+
+6. ROLE-BASED ACCESS
+   Test: Student trying to access director feature
+   Expected: ❌ DENIED with code: INSUFFICIENT_PRIVILEGES
+   
+   Test: Director accessing director feature
+   Expected: ✅ ACCEPTED
+
+═══════════════════════════════════════════════════════════════════════════════
+🔍 MANUAL TEST CASES - Kiểm tra bằng tay
+═══════════════════════════════════════════════════════════════════════════════
+
+Nếu muốn kiểm tra bằng Postman hoặc cURL:
+
+1. LOGIN TEST:
+   ────────────
+   
+   ✅ VALID LOGIN:
+   POST http://localhost:8080/api/auth/login
+   Content-Type: application/json
+   
+   {
+     "email": "giamdoc@truong.vn",
+     "password": "123456"
+   }
+   
+   Expected Response:
+   {
+     "success": true,
+     "message": "Đăng nhập thành công",
+     "token": "eyJhbGc...",
+     "user": { "id": 1, "email": "...", "role": "director" }
+   }
+   
+   ❌ INVALID EMAIL:
+   {
+     "email": "not-an-email",
+     "password": "123456"
+   }
+   
+   Expected Response:
+   {
+     "success": false,
+     "message": "Email không hợp lệ",
+     "code": "INVALID_EMAIL"
+   }
+   
+   ❌ SHORT PASSWORD:
+   {
+     "email": "giamdoc@truong.vn",
+     "password": "12345"
+   }
+   
+   Expected Response:
+   {
+     "success": false,
+     "message": "Mật khẩu phải có ít nhất 6 ký tự",
+     "code": "INVALID_PASSWORD"
+   }
+
+2. REGISTER TOPIC TEST:
+   ─────────────────────
+   
+   ✅ VALID REGISTRATION:
+   POST http://localhost:8080/api/topics/register
+   Authorization: Bearer <token>
+   Content-Type: application/json
+   
+   {
+     "title": "Smart City IoT System",
+     "english_title": "Building IoT for Smart Cities",
+     "field_of_study": "IT",
+     "instructor_id": 3,
+     "campaign_id": 1
+   }
+   
+   Expected Response:
+   {
+     "success": true,
+     "message": "Đăng ký đề tài thành công!",
+     "topicId": 5
+   }
+   
+   ❌ INVALID INSTRUCTOR:
+   {
+     "title": "Test Topic",
+     "field_of_study": "IT",
+     "instructor_id": 9999,  // Not exist
+     "campaign_id": 1
+   }
+   
+   Expected Response:
+   {
+     "success": false,
+     "message": "Giảng viên không tồn tại",
+     "code": "INVALID_INSTRUCTOR"
+   }
+
+3. SCORE SUBMISSION TEST:
+   ──────────────────────
+   
+   ✅ VALID SCORE:
+   POST http://localhost:8080/api/scores/submit
+   Authorization: Bearer <council_token>
+   Content-Type: application/json
+   
+   {
+     "topic_id": 5,
+     "level": 1,
+     "urgency_score": 80,
+     "method_score": 85,
+     "result_score": 90,
+     "comment": "Good thesis"
+   }
+   
+   Expected Response:
+   {
+     "success": true,
+     "message": "Lưu điểm thành công!"
+   }
+   
+   ❌ INVALID SCORE:
+   {
+     "topic_id": 5,
+     "level": 1,
+     "urgency_score": 150,  // > 100
+     "method_score": 85,
+     "result_score": 90
+   }
+   
+   Expected Response:
+   {
+     "success": false,
+     "message": "Urgency Score: Điểm phải là số từ 0 đến 100",
+     "code": "INVALID_SCORE"
+   }
+
+═══════════════════════════════════════════════════════════════════════════════
+📊 TEST RESULTS TRACKING
+═══════════════════════════════════════════════════════════════════════════════
+
+Sau khi chạy test, ghi lại kết quả:
+
+Date: ________________
+
+VERIFY_UPGRADE.js
+  ☐ All file checks passed
+  ☐ Total checks passed: ___ / ___
+  ☐ Success rate: ___%
+
+test_validators_quick.js
+  ☐ All tests passed
+  ☐ Total tests: ___ / ___
+  ☐ Success rate: ___%
+
+test_auth_improvements.js
+  ☐ All tests passed
+  ☐ Total tests: ___ / ___
+  ☐ Success rate: ___%
+
+test_comprehensive_upgrade.js
+  ☐ All tests passed
+  ☐ Total tests: ___ / ___
+  ☐ Success rate: ___%
+
+Overall Status: ☐ PASS  ☐ FAIL
+
+Notes:
+_______________________________________________________________________
+_______________________________________________________________________
+_______________________________________________________________________
+
+═══════════════════════════════════════════════════════════════════════════════
+🎯 SUCCESS CRITERIA
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ Upgrade is successful if:
+
+1. VERIFY_UPGRADE.js reports 100% checks passed
+2. test_validators_quick.js shows 25/25 tests passed
+3. test_auth_improvements.js shows 12+/12+ tests passed
+4. test_comprehensive_upgrade.js shows 50+/50+ tests passed
+5. All manual test cases work as expected
+6. Error codes are returned correctly
+7. Response format is consistent
+8. Validation rejects invalid input
+9. Authentication works correctly
+10. Authorization blocks unauthorized access
+
+═══════════════════════════════════════════════════════════════════════════════
+🚨 TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════════
+
+Problem: "validators module not found"
+Solution: Make sure validators.js is in backend/ directory
+
+Problem: "Database connection failed"
+Solution: Make sure backend/.env has correct DB credentials
+
+Problem: "Token verification failed"
+Solution: Make sure JWT_SECRET in .env matches authMiddleware
+
+Problem: Test fails on faculty validation
+Solution: Use exact faculty names from VALID_FACULTIES list
+
+Problem: Password validation fails
+Solution: Password must be at least 6 characters
+
+Problem: Test file not found
+Solution: Make sure you're in d:\khoaluan directory
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Ready to test? Let's verify the upgrade is complete and working correctly!
+
+For more details, see: UPGRADE_SUMMARY.md
+
+═══════════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,257 @@
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                                                                          ║
+║           🚀 CÁCH CHẠY TEST - VISUAL GUIDE (Hình Ảnh Từng Bước)        ║
+║                                                                          ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+
+═══════════════════════════════════════════════════════════════════════════
+         PHƯƠNG ÁN 1: CHẠY REAL API TEST (Recommended)
+═══════════════════════════════════════════════════════════════════════════
+
+TIMELINE:    [Backend chạy]    [Test chạy]    [Kết quả]
+            Terminal 1        Terminal 2
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ STEP 1: MỞ 2 TERMINAL                                                   │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  Windows Key + R  →  gõ "cmd"  →  Nhấn Enter                          │
+│  (Lặp lại 1 lần nữa để mở Terminal 2)                                  │
+│                                                                          │
+│  Kết quả: 2 cmd windows mở trên màn hình                              │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ STEP 2: TERMINAL 1 - KHỞI ĐỘNG BACKEND                                  │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  [Terminal 1]                                                           │
+│  C:\> cd d:\khoaluan\backend                                           │
+│  C:\d:\khoaluan\backend> node server.js                                │
+│                                                                          │
+│  [Chờ khoảng 5 giây...]                                                │
+│                                                                          │
+│  Kết quả sẽ hiện:                                                      │
+│  ────────────────────────────────────────────────────────────────       │
+│  ✅ Đã kết nối thành công tới MySQL trên Aiven!                       │
+│  Backend Server đang chạy tại http://0.0.0.0:8080                    │
+│  ────────────────────────────────────────────────────────────────       │
+│                                                                          │
+│  ⚠️ QUAN TRỌNG: Hãy để Terminal 1 chạy, đừng đóng nó!               │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ STEP 3: TERMINAL 2 - CHẠY TEST                                          │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  [Terminal 2]                                                           │
+│  C:\> cd d:\khoaluan                                                   │
+│  C:\d:\khoaluan> node test_real_api.js                                │
+│                                                                          │
+│  [Kết quả ngay lập tức...]                                             │
+│                                                                          │
+│  Bạn sẽ thấy:                                                          │
+│  ────────────────────────────────────────────────────────────────       │
+│  ╔════════════════════════════════════════════╗                        │
+│  ║   REAL API TESTING - Chạy Thực Tế         ║                        │
+│  ║ Backend must be running on :8080          ║                        │
+│  ╚════════════════════════════════════════════╝                        │
+│                                                                          │
+│  Base URL: http://localhost:8080                                       │
+│  Please ensure backend server is running                               │
+│                                                                          │
+│  . (waiting...)                                                         │
+│  ✓ Server is ready!                                                    │
+│  ────────────────────────────────────────────────────────────────       │
+│                                                                          │
+│  [Bắt đầu các tests...]                                               │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ STEP 4: CHỜ KẾT QUẢ                                                     │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  Bạn sẽ thấy các tests chạy lần lượt:                                 │
+│                                                                          │
+│  ═══ TEST 1: Seed Admin Account ═══                                   │
+│  → GET /api/auth/seed                                                  │
+│  ← 200 ...                                                              │
+│  ✓ Admin account seeded successfully                                   │
+│                                                                          │
+│  ═══ TEST 2: Seed Sample Users ═══                                    │
+│  → GET /api/users/seed                                                 │
+│  ← 200 ...                                                              │
+│  ✓ Sample users seeded                                                 │
+│                                                                          │
+│  ... [tiếp tục 8 tests khác] ...                                       │
+│                                                                          │
+│  ═══ TEST SUMMARY ═══                                                  │
+│  ✓ Seed Admin                                                          │
+│  ✓ Seed Users                                                          │
+│  ✓ Login Admin                                                         │
+│  ✓ Get Profile                                                         │
+│  ✓ Get Instructors                                                     │
+│  ✓ Get Faculties                                                       │
+│  ✓ Get All Users                                                       │
+│  ✓ Invalid Token                                                       │
+│  ✓ Without Token                                                       │
+│                                                                          │
+│  ═══════════════════════════════════════════════                       │
+│  Result: 10 / 10 tests passed                                          │
+│  ✓ All API tests passed!                                               │
+│  ═══════════════════════════════════════════════                       │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+
+✅ THÀNH CÔNG!
+
+Nếu bạn thấy:
+  ✓ = Tất cả tests xanh lá
+  Result: 10 / 10 tests passed
+  
+  → CONGRATULATIONS! 🎉 System of you is ready!
+
+
+═══════════════════════════════════════════════════════════════════════════
+         PHƯƠNG ÁN 2: CHẠY TEST ĐƠN LẺ (Không cần Backend)
+═══════════════════════════════════════════════════════════════════════════
+
+Nếu bạn chỉ muốn chạy test mà không khởi động backend:
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ COMMAND 1: Test Authentication Logic                                    │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  cd d:\khoaluan                                                        │
+│  node test_auth_logic.js                                               │
+│                                                                          │
+│  Thời gian: < 1 giây                                                  │
+│  Kiểm tra: JWT, bcrypt, password comparison                            │
+│  Kết quả: ✓ All tests passed                                          │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ COMMAND 2: Test API Integration                                         │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  cd d:\khoaluan                                                        │
+│  node test_api_integration.js                                           │
+│                                                                          │
+│  Thời gian: 2-3 giây                                                  │
+│  Kiểm tra: Data linking, faculties, instructors                       │
+│  Kết quả: ✓ All checks passed                                         │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ COMMAND 3: Test Complete Flow                                           │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  cd d:\khoaluan                                                        │
+│  node test_complete_flow.js                                             │
+│                                                                          │
+│  Thời gian: 1-2 giây                                                  │
+│  Kiểm tra: Full flow simulation (login → protected routes → errors)    │
+│  Kết quả: ✓ All scenarios verified                                    │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ COMMAND 4: Full System Test (12 tests)                                  │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  cd d:\khoaluan                                                        │
+│  node test_system.js                                                    │
+│                                                                          │
+│  Thời gian: 5-10 giây                                                 │
+│  Kiểm tra: 12 comprehensive tests                                      │
+│  Kết quả: ✓ 12/12 tests passed                                        │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════
+                            QUICK COPY-PASTE COMMANDS
+═══════════════════════════════════════════════════════════════════════════
+
+Để cho nhanh, bạn có thể copy-paste các command này:
+
+┌─ TERMINAL 1 (Backend) ──────────────────────────────────────────────────┐
+│                                                                          │
+│  cd d:\khoaluan\backend && node server.js                              │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌─ TERMINAL 2 (Tests) ────────────────────────────────────────────────────┐
+│                                                                          │
+│  cd d:\khoaluan && node test_real_api.js                               │
+│                                                                          │
+│  Hoặc các test khác:                                                   │
+│  cd d:\khoaluan && node test_auth_logic.js                             │
+│  cd d:\khoaluan && node test_api_integration.js                        │
+│  cd d:\khoaluan && node test_system.js                                 │
+│  cd d:\khoaluan && node test_complete_flow.js                          │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════
+                          EXPECTED COLORS & MEANING
+═══════════════════════════════════════════════════════════════════════════
+
+✓ (Green checkmark)   = Test PASSED, success
+✗ (Red X)            = Test FAILED, error
+→ (Blue arrow right)  = API request going out
+← (Blue arrow left)   = API response coming back
+ℹ (Blue info)        = Information message
+⚠ (Yellow warning)   = Warning message
+
+
+═══════════════════════════════════════════════════════════════════════════
+                          TROUBLESHOOTING QUICK FIX
+═══════════════════════════════════════════════════════════════════════════
+
+❌ "Cannot find module 'mysql2/promise'"
+   → cd d:\khoaluan\backend && npm install
+
+❌ "Port 8080 already in use"
+   → netstat -ano | findstr :8080
+   → taskkill /PID [PID_NUMBER] /F
+
+❌ "ECONNREFUSED - Cannot connect to backend"
+   → Make sure Terminal 1 is running with: node server.js
+
+❌ "Cannot find ca.pem"
+   → Download from Aiven Dashboard
+   → Put it in: d:\khoaluan\backend\ca.pem
+
+
+═══════════════════════════════════════════════════════════════════════════
+                          SUMMARY - 3 EASY STEPS
+═══════════════════════════════════════════════════════════════════════════
+
+1️⃣  Open Terminal 1
+    → cd d:\khoaluan\backend && node server.js
+
+2️⃣  Open Terminal 2
+    → cd d:\khoaluan && node test_real_api.js
+
+3️⃣  Wait for results
+    → Should see: "Result: 10 / 10 tests passed ✓"
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+✨ BẠN READY CHƯA? LET'S GO! 🚀
+
+Hãy mở Terminal 1 và chạy:
+
+    cd d:\khoaluan\backend && node server.js
+
+═══════════════════════════════════════════════════════════════════════════
