@@ -79,7 +79,8 @@ const topicController = {
         query += ' WHERE ' + whereClauses.join(' AND ');
       }
 
-      query += ' ORDER BY avg_scores.average_score DESC, t.created_at DESC';
+      // Ưu tiên xếp theo vòng thi (Hoàn thành -> Vòng Trường -> Vòng Khoa -> Dừng -> Từ chối)
+      query += " ORDER BY CASE WHEN t.status = 'rejected' THEN -1 ELSE t.round_status END DESC, avg_scores.average_score DESC, t.created_at DESC";
 
       const [rows] = await pool.execute(query, params);
       res.status(200).json({
@@ -305,14 +306,14 @@ const topicController = {
           c.name as campaign_name,
           c.academic_year as campaign_year,
           c.status as campaign_status,
-          sc.total_score,
+          IFNULL(sc.total_score, CASE WHEN sc.result_score IS NOT NULL THEN IFNULL(sc.urgency_score, 0) + IFNULL(sc.method_score, 0) + sc.result_score ELSE NULL END) as total_score,
           sc.level as score_level
         FROM scores sc
         JOIN topics t ON sc.topic_id = t.id
         LEFT JOIN users s ON t.student_id = s.id
         LEFT JOIN users i ON t.instructor_id = i.id
         LEFT JOIN campaigns c ON t.campaign_id = c.id
-        WHERE sc.council_member_id = ? AND (t.status = 'grading' OR sc.total_score IS NOT NULL)
+        WHERE sc.council_member_id = ? AND (t.status = 'grading' OR sc.result_score IS NOT NULL OR sc.total_score IS NOT NULL)
       `;
       
       let params = [council_member_id];
@@ -348,7 +349,15 @@ const topicController = {
       if (topic.length === 0) {
         return res.status(404).json({ message: 'Không tìm thấy đề tài' });
       }
-      const [scores] = await pool.execute('SELECT DISTINCT council_member_id, level FROM scores WHERE topic_id = ?', [id]);
+      const [scores] = await pool.execute(`
+        SELECT s.council_member_id, s.level, s.comment, 
+               IFNULL(s.total_score, CASE WHEN s.result_score IS NOT NULL THEN IFNULL(s.urgency_score, 0) + IFNULL(s.method_score, 0) + s.result_score ELSE NULL END) as total_score,
+               u.full_name as council_name
+        FROM scores s
+        LEFT JOIN users u ON s.council_member_id = u.id
+        WHERE s.topic_id = ?
+        ORDER BY s.level DESC
+      `, [id]);
       res.status(200).json({ ...topic[0], scores });
     } catch (error) {
       console.error('[Backend Error] Lỗi khi lấy chi tiết đề tài:', error);
@@ -360,7 +369,7 @@ const topicController = {
   updateTopicStatus: async (req, res) => {
     try {
       const { id } = req.params;
-      const { status, round_status, funding, funding_status, revision_reason, award, effectiveness } = req.body;
+      const { status, round_status, funding, funding_status, revision_reason, award, effectiveness, average_score } = req.body;
 
       let updateFields = [];
       let params = [];
@@ -372,6 +381,7 @@ const topicController = {
       if (revision_reason !== undefined) { updateFields.push('revision_reason = ?'); params.push(revision_reason); }
       if (award !== undefined) { updateFields.push('award = ?'); params.push(award); }
       if (effectiveness !== undefined) { updateFields.push('effectiveness = ?'); params.push(effectiveness); }
+      if (average_score !== undefined) { updateFields.push('average_score = ?'); params.push(average_score); }
 
       if (updateFields.length === 0) {
         return res.status(400).json({ message: 'Không có dữ liệu nào được gửi để cập nhật.' });
@@ -499,15 +509,15 @@ const topicController = {
         i.full_name as instructor_name,
         c.name as campaign_name,
         c.academic_year as campaign_year,
-        avg_scores.average_score
+        IFNULL(avg_scores.average_score, t.average_score) as average_score
       FROM topics t
       LEFT JOIN users s ON t.student_id = s.id
       LEFT JOIN users i ON t.instructor_id = i.id
       LEFT JOIN campaigns c ON t.campaign_id = c.id
       LEFT JOIN (
-          SELECT topic_id, level, AVG(total_score) as average_score 
+          SELECT topic_id, level, AVG(IFNULL(total_score, result_score)) as average_score 
           FROM scores 
-          WHERE total_score IS NOT NULL
+          WHERE total_score IS NOT NULL OR result_score IS NOT NULL
           GROUP BY topic_id, level
       ) as avg_scores ON t.id = avg_scores.topic_id AND (
           t.round_status = avg_scores.level OR 

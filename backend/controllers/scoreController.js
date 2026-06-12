@@ -6,7 +6,7 @@ const scoreController = {
   submitScore: async (req, res) => {
     try {
       const council_member_id = req.user.id;
-      const { topic_id, level, urgency_score, method_score, result_score, comment } = req.body;
+      const { topic_id, level, total_score, comment } = req.body;
 
       // ✅ VALIDATION 1: Required fields
       const requiredCheck = validateRequired({ topic_id, level }, ['topic_id', 'level']);
@@ -18,35 +18,13 @@ const scoreController = {
         });
       }
 
-      // ✅ VALIDATION 2: Validate scores (0-100)
-      if (urgency_score !== undefined && urgency_score !== null) {
-        const scoreCheck = validateScore(urgency_score);
+      // ✅ VALIDATION 2: Validate tổng điểm (0-100)
+      if (total_score !== undefined && total_score !== null) {
+        const scoreCheck = validateScore(total_score);
         if (!scoreCheck.valid) {
           return res.status(400).json({
             success: false,
-            message: `Urgency Score: ${scoreCheck.error}`,
-            code: 'INVALID_SCORE'
-          });
-        }
-      }
-
-      if (method_score !== undefined && method_score !== null) {
-        const scoreCheck = validateScore(method_score);
-        if (!scoreCheck.valid) {
-          return res.status(400).json({
-            success: false,
-            message: `Method Score: ${scoreCheck.error}`,
-            code: 'INVALID_SCORE'
-          });
-        }
-      }
-
-      if (result_score !== undefined && result_score !== null) {
-        const scoreCheck = validateScore(result_score);
-        if (!scoreCheck.valid) {
-          return res.status(400).json({
-            success: false,
-            message: `Result Score: ${scoreCheck.error}`,
+            message: `Tổng điểm: ${scoreCheck.error}`,
             code: 'INVALID_SCORE'
           });
         }
@@ -88,19 +66,27 @@ const scoreController = {
       }
 
       // ✅ Update scores
-      // Không cập nhật total_score vì MySQL tự động tính toán (Generated Column).
-      // Thay đổi logic kiểm tra để số 0 không bị biến thành null.
+      try {
+        await pool.execute(
+          'UPDATE scores SET urgency_score = 0, method_score = 0, result_score = ?, total_score = ?, comment = ? WHERE topic_id = ? AND council_member_id = ? AND level = ?',
+          [ total_score, total_score, comment || null, topic_id, council_member_id, level ]
+        );
+      } catch (err) {
+        // Nếu total_score là cột tự động tính (Generated Column) hoặc không tồn tại, chỉ cập nhật result_score
+        if (err.code === 'ER_BAD_FIELD_ERROR' || err.message.includes('generated column') || err.message.includes('Unknown column')) {
+          await pool.execute(
+            'UPDATE scores SET urgency_score = 0, method_score = 0, result_score = ?, comment = ? WHERE topic_id = ? AND council_member_id = ? AND level = ?',
+            [ total_score, comment || null, topic_id, council_member_id, level ]
+          );
+        } else {
+          throw err;
+        }
+      }
+
+      // ✅ ĐỒNG BỘ ĐIỂM SANG BẢNG TOPICS ĐỂ HIỂN THỊ RA GIAO DIỆN
       await pool.execute(
-        'UPDATE scores SET urgency_score = ?, method_score = ?, result_score = ?, comment = ? WHERE topic_id = ? AND council_member_id = ? AND level = ?',
-        [
-          urgency_score !== undefined && urgency_score !== null ? urgency_score : null,
-          method_score !== undefined && method_score !== null ? method_score : null,
-          result_score !== undefined && result_score !== null ? result_score : null,
-          comment || null, 
-          topic_id, 
-          council_member_id, 
-          level
-        ]
+        'UPDATE topics SET average_score = ? WHERE id = ?',
+        [total_score, topic_id]
       );
 
       res.status(200).json({
@@ -145,7 +131,7 @@ const scoreController = {
 
       // ✅ Get score
       const [rows] = await pool.execute(
-        'SELECT * FROM scores WHERE topic_id = ? AND council_member_id = ? AND level = ?',
+        'SELECT *, IFNULL(total_score, CASE WHEN result_score IS NOT NULL THEN IFNULL(urgency_score, 0) + IFNULL(method_score, 0) + result_score ELSE NULL END) AS total_score FROM scores WHERE topic_id = ? AND council_member_id = ? AND level = ?',
         [topicId, council_member_id, level || 1]
       );
 

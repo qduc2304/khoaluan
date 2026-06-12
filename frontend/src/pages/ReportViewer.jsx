@@ -20,7 +20,13 @@ export default function ReportViewer() {
     try {
       // Lấy lịch sử báo cáo từ backend
       const response = await api.get('/reports');
-      setReports(response.data);
+      
+      let reportsData = [];
+      if (Array.isArray(response)) reportsData = response;
+      else if (response?.data && Array.isArray(response.data)) reportsData = response.data;
+      else if (response?.data?.data && Array.isArray(response.data.data)) reportsData = response.data.data;
+      
+      setReports(reportsData);
     } catch (error) {
       message.error('Không thể tải dữ liệu báo cáo từ máy chủ!');
     } finally {
@@ -96,7 +102,7 @@ export default function ReportViewer() {
   ];
 
   const filteredReports = useMemo(() => {
-    return reports.filter(report => {
+    return (Array.isArray(reports) ? reports : []).filter(report => {
       const matchSearch = (report.topic_title || '').toLowerCase().includes(searchText.toLowerCase()) ||
                           (report.student_name || '').toLowerCase().includes(searchText.toLowerCase());
       let matchStatus = true;

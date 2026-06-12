@@ -5,19 +5,19 @@ const scoreController = {
   submitScore: async (req, res) => {
     try {
       const council_member_id = req.user.id;
-      const { topic_id, level, urgency_score, method_score, result_score, comment } = req.body;
+      const { topic_id, level, total_score, comment } = req.body;
 
-      if (urgency_score === undefined || method_score === undefined || result_score === undefined) {
-        return res.status(400).json({ message: 'Vui lòng cung cấp đủ các đầu điểm.' });
+      if (total_score === undefined) {
+        return res.status(400).json({ message: 'Vui lòng cung cấp tổng điểm.' });
       }
 
       // Logic: Điểm được cập nhật vào bản ghi đã được tạo khi phân công.
       // Do đó, ta dùng UPDATE.
       const [result] = await pool.execute(
         `UPDATE scores 
-         SET urgency_score = ?, method_score = ?, result_score = ?, comment = ?
+         SET urgency_score = 0, method_score = 0, result_score = ?, comment = ?
          WHERE topic_id = ? AND council_member_id = ? AND level = ?`,
-        [urgency_score, method_score, result_score, comment || null, topic_id, council_member_id, level]
+        [total_score, comment || null, topic_id, council_member_id, level]
       );
 
       if (result.affectedRows === 0) {
@@ -45,7 +45,7 @@ const scoreController = {
       }
 
       const [rows] = await pool.execute(
-        'SELECT urgency_score, method_score, result_score, comment FROM scores WHERE topic_id = ? AND council_member_id = ? AND level = ?',
+        'SELECT (urgency_score + method_score + result_score) AS total_score, comment FROM scores WHERE topic_id = ? AND council_member_id = ? AND level = ?',
         [topic_id, council_member_id, level]
       );
 

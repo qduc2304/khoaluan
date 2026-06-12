@@ -16,8 +16,8 @@ router.get('/stats', authorize('specialist', 'director'), topicController.getDas
 router.get('/', authorize('specialist', 'director'), topicController.getAllTopics);
 router.delete('/:id', authorize('specialist', 'director'), topicController.deleteTopic);
 
-//----- Dành cho Chuyên viên -----
-router.post('/:id/assign', authorize('specialist'), topicController.assignCouncil);
+//----- Dành cho Chuyên viên & Giám đốc -----
+router.post('/:id/assign', authorize('specialist', 'director'), topicController.assignCouncil);
 
 //----- Dành cho Sinh viên -----
 router.post('/register', authorize('student'), topicController.registerTopic);
@@ -33,7 +33,7 @@ router.get('/assigned', authorize('council'), topicController.getAssignedTopics)
 //----- Dành cho nhiều vai trò -----
 
 // Cập nhật trạng thái (GV duyệt, Khoa duyệt, GĐ duyệt)
-router.patch('/:id/status', authorize('instructor', 'specialist', 'director'), topicController.updateTopicStatus);
+router.patch('/:id/status', authorize('instructor', 'specialist', 'director', 'council'), topicController.updateTopicStatus);
 
 // Lấy chi tiết đề tài (mọi người dùng đã đăng nhập đều có thể xem)
 router.get('/:id/details', topicController.getTopicDetails);

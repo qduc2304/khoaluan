@@ -37,8 +37,13 @@ const Login = () => {
     <div className="login-page-container">
       <div className="login-card">
         <div className="login-title-container">
+          <img 
+            src="/logo.png" 
+            alt="Logo Đại học Thái Bình" 
+            style={{ width: '150px', height: 'auto', marginBottom: '0', objectFit: 'contain' }} 
+          />
           <h1 className="login-title-main">
-            Xây dựng Website quản lý Hội thi nghiên cứu khoa học của Sinh viên Trường Đại học Thái Bình
+            Website quản lý hội thi nghiên cứu khoa học của sinh viên Trường Đại học Thái Bình
           </h1>
           <p className="login-title-sub">
             Hệ thống Đăng nhập

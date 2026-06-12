@@ -1,4 +1,4 @@
-import { CheckCircleOutlined, CloseCircleOutlined, EditOutlined, FileOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, CloseCircleOutlined, EyeOutlined, FileOutlined, RollbackOutlined } from '@ant-design/icons';
 import { Button, Card, Divider, Input, List, message, Modal, Popconfirm, Space, Table, Tag, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import api from '../../services/api';
@@ -163,7 +163,7 @@ const ApproveTopics = () => {
       key: 'action',
       render: (_, record) => (
         <Space direction="vertical" size="small">
-          <Button icon={<InfoCircleOutlined />} onClick={() => showDetailsModal(record)}>
+          <Button icon={<EyeOutlined />} onClick={() => showDetailsModal(record)}>
             Chi tiết
           </Button>
 
@@ -180,7 +180,7 @@ const ApproveTopics = () => {
               </Popconfirm>
               
               <Button 
-                icon={<EditOutlined />} 
+                icon={<RollbackOutlined />} 
                 onClick={() => showRevisionModal(record.id)}
               >
                 Sửa

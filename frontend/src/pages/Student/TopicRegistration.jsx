@@ -127,8 +127,8 @@ const TopicRegistration = () => {
   }
 
   return (
-    <Card style={{ maxWidth: 800, margin: '16px auto', width: '100%' }}>
-      <Title level={3} style={{ textAlign: 'center', color: '#1890ff', marginBottom: 24 }}>
+    <Card size="small" style={{ maxWidth: 800, margin: '8px auto', width: '100%' }}>
+      <Title level={4} style={{ textAlign: 'center', color: '#1890ff', margin: '8px 0 16px 0' }}>
         {editTopic ? 'Cập Nhật Đề Tài' : 'Đăng Ký Đề Tài Nghiên Cứu Khoa Học'}
       </Title>
       
@@ -167,7 +167,7 @@ const TopicRegistration = () => {
       )}
 
       {studentProfile && ( // Thay đổi tiêu đề để làm rõ vai trò
-        <Descriptions title="Thông tin Nhóm trưởng (Người đăng ký)" bordered size="small" style={{ marginBottom: 24 }}>
+        <Descriptions title="Thông tin Nhóm trưởng (Người đăng ký)" bordered size="small" column={{ xs: 1, sm: 2, md: 3 }} style={{ marginBottom: 16 }}>
           <Descriptions.Item label="Họ và tên">{studentProfile.full_name}</Descriptions.Item>
           <Descriptions.Item label="Mã SV">{studentProfile.student_code}</Descriptions.Item>
           <Descriptions.Item label="Lớp">{studentProfile.class_name || 'N/A'}</Descriptions.Item>
@@ -179,6 +179,7 @@ const TopicRegistration = () => {
       <Form 
         form={form} 
         layout="vertical" 
+        size="small"
         onFinish={onFinish}
         disabled={!editTopic && activeCampaigns.length === 0}
       >
@@ -193,22 +194,42 @@ const TopicRegistration = () => {
           </Select>
         </Form.Item>
 
-        <Form.Item label="Tên đề tài (Tiếng Việt)" name="title" rules={[{ required: true, message: 'Vui lòng nhập tên đề tài!' }]}>
-          <Input placeholder="Nhập tên đề tài NCKH (Tiếng Việt)..." />
-        </Form.Item>
-
-        <Form.Item label="Tên đề tài (Tiếng Anh)" name="english_title">
-          <Input placeholder="Nhập tên đề tài NCKH (Tiếng Anh)..." />
-        </Form.Item>
-
-        <Form.Item label="Lĩnh vực nghiên cứu (Khoa)" name="field_of_study" initialValue="Khoa Công nghệ và Kỹ thuật">
-          <Select>
-            <Select.Option value="Khoa Công nghệ và Kỹ thuật">Khoa Công nghệ và Kỹ thuật</Select.Option>
-            <Select.Option value="Khoa Kinh tế và Quản trị">Khoa Kinh tế và Quản trị</Select.Option>
-            <Select.Option value="Khoa Luật, Chính trị học và Quan hệ Quốc tế">Khoa Luật, Chính trị học và Quan hệ Quốc tế</Select.Option>
-            <Select.Option value="Khoa Khoa học Cơ bản">Khoa Khoa học Cơ bản</Select.Option>
-          </Select>
-        </Form.Item>
+        <Row gutter={16}>
+          <Col xs={24} md={12}>
+            <Form.Item label="Tên đề tài (Tiếng Việt)" name="title" rules={[{ required: true, message: 'Vui lòng nhập tên đề tài!' }]}>
+              <Input placeholder="Nhập tên đề tài NCKH (Tiếng Việt)..." />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item label="Tên đề tài (Tiếng Anh)" name="english_title">
+              <Input placeholder="Nhập tên đề tài NCKH (Tiếng Anh)..." />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item label="Lĩnh vực nghiên cứu (Khoa)" name="field_of_study" initialValue="Khoa Công nghệ và Kỹ thuật">
+              <Select>
+                <Select.Option value="Khoa Công nghệ và Kỹ thuật">Khoa Công nghệ và Kỹ thuật</Select.Option>
+                <Select.Option value="Khoa Kinh tế và Quản trị">Khoa Kinh tế và Quản trị</Select.Option>
+                <Select.Option value="Khoa Luật, Chính trị học và Quan hệ Quốc tế">Khoa Luật, Chính trị học và Quan hệ Quốc tế</Select.Option>
+                <Select.Option value="Khoa Khoa học Cơ bản">Khoa Khoa học Cơ bản</Select.Option>
+              </Select>
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item label="Giảng viên hướng dẫn" name="instructor_id" rules={[{ required: true, message: 'Vui lòng chọn GVHD!' }]}>
+              <Select
+                showSearch
+                placeholder="Chọn giảng viên hướng dẫn..."
+                optionFilterProp="children"
+                filterOption={(input, option) => (option?.children ?? '').toLowerCase().includes(input.toLowerCase())}
+              >
+                {instructors.map(instructor => (
+                  <Option key={instructor.id} value={instructor.id}>{instructor.full_name}</Option>
+                ))}
+              </Select>
+            </Form.Item>
+          </Col>
+        </Row>
 
         <Form.List name="team_members">
           {(fields, { add, remove }) => (
@@ -243,24 +264,11 @@ const TopicRegistration = () => {
           )}
         </Form.List>
 
-        <Form.Item label="Giảng viên hướng dẫn" name="instructor_id" rules={[{ required: true, message: 'Vui lòng chọn GVHD!' }]}>
-          <Select
-            showSearch
-             placeholder="Chọn giảng viên hướng dẫn..."
-            optionFilterProp="children"
-            filterOption={(input, option) => (option?.children ?? '').toLowerCase().includes(input.toLowerCase())}
-          >
-            {instructors.map(instructor => (
-              <Option key={instructor.id} value={instructor.id}>{instructor.full_name}</Option>
-            ))}
-          </Select>
-        </Form.Item>
-
         <Form.Item label="Tóm tắt nội dung (Thuyết minh)" name="description" rules={[{ required: true, message: 'Vui lòng nhập tóm tắt!' }]}>
-          <TextArea rows={4} placeholder="Mô tả ngắn gọn mục tiêu..." />
+          <TextArea rows={2} placeholder="Mô tả ngắn gọn mục tiêu, phương pháp và kết quả dự kiến..." />
         </Form.Item>
-        <Form.Item>
-          <Button type="primary" htmlType="submit" loading={loading} block size="large" disabled={!editTopic && activeCampaigns.length === 0}>
+        <Form.Item style={{ marginBottom: 0 }}>
+          <Button type="primary" htmlType="submit" loading={loading} block disabled={!editTopic && activeCampaigns.length === 0}>
             {editTopic ? 'Cập Nhật Đề Tài' : 'Nộp Đăng Ký'}
           </Button>
         </Form.Item>

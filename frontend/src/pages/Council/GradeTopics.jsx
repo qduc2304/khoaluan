@@ -1,4 +1,4 @@
-import { ArrowLeftOutlined, EditOutlined, EyeOutlined, FileOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, EditOutlined, EyeOutlined, FileOutlined } from '@ant-design/icons';
 import { Button, Card, Col, Divider, Form, Input, InputNumber, List, message, Modal, Row, Select, Space, Table, Tag, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import api from '../../services/api';
@@ -31,20 +31,30 @@ const GradeTopics = () => {
 
   // Phân loại đề tài đã chấm và chưa chấm trong một đợt thi
   const ungradedTopics = useMemo(() => topics.filter(topic => {
-    if (topic.total_score != null) return false;
-    if (levelFilter !== 'all' && Number(topic.score_level || topic.round_status) !== Number(levelFilter)) return false;
-    return true;
+    if (levelFilter !== 'all') {
+      const targetRound = topic.rounds?.find(r => Number(r.score_level) === Number(levelFilter));
+      if (!targetRound || targetRound.total_score != null) return false;
+      return true;
+    }
+    return topic.rounds?.some(r => r.total_score == null);
   }), [topics, levelFilter]);
   
   const gradedTopicsInCampaign = useMemo(() => topics.filter(topic => {
-    if (topic.total_score == null || topic.status === 'completed') return false;
-    if (levelFilter !== 'all' && Number(topic.score_level || topic.round_status) !== Number(levelFilter)) return false;
-    return true;
+    if (topic.status === 'completed') return false;
+    if (levelFilter !== 'all') {
+      const targetRound = topic.rounds?.find(r => Number(r.score_level) === Number(levelFilter));
+      if (!targetRound || targetRound.total_score == null) return false;
+      return true;
+    }
+    return topic.rounds?.every(r => r.total_score != null);
   }), [topics, levelFilter]);
   
   const completedTopicsInCampaign = useMemo(() => topics.filter(topic => {
-    if (topic.total_score == null || topic.status !== 'completed') return false;
-    if (levelFilter !== 'all' && Number(topic.score_level || topic.round_status) !== Number(levelFilter)) return false;
+    if (topic.status !== 'completed') return false;
+    if (levelFilter !== 'all') {
+      const targetRound = topic.rounds?.find(r => Number(r.score_level) === Number(levelFilter));
+      if (!targetRound) return false;
+    }
     return true;
   }), [topics, levelFilter]);
 
@@ -82,8 +92,20 @@ const GradeTopics = () => {
             topics: []
           });
         }
-        // Sử dụng key tổng hợp để đảm bảo tính duy nhất cho mỗi phân công (đề tài + vòng chấm)
-        campaignsMap.get(topic.campaign_id).topics.push({ ...topic, key: `${topic.id}-${topic.score_level}` });
+        
+        const campaign = campaignsMap.get(topic.campaign_id);
+        const existingTopic = campaign.topics.find(t => t.id === topic.id);
+        
+        if (existingTopic) {
+          existingTopic.rounds.push({ score_level: topic.score_level, total_score: topic.total_score });
+          existingTopic.rounds.sort((a, b) => b.score_level - a.score_level);
+        } else {
+          campaign.topics.push({ 
+            ...topic, 
+            key: topic.id.toString(),
+            rounds: [{ score_level: topic.score_level, total_score: topic.total_score }]
+          });
+        }
       });
       
       const allCampaigns = Array.from(campaignsMap.values());
@@ -95,8 +117,8 @@ const GradeTopics = () => {
         if (campaign.status === 'closed') {
           completed.push(campaign);
         } else {
-          // Một đợt thi được coi là "đang diễn ra" nếu có ít nhất một đề tài chưa được giám khảo này chấm điểm.
-          const isOngoing = campaign.topics.some(topic => topic.total_score == null);
+          // Một đợt thi "đang diễn ra" nếu có ít nhất một đề tài có vòng chấm chưa được chấm điểm.
+          const isOngoing = campaign.topics.some(topic => topic.rounds?.some(r => r.total_score == null));
           if (isOngoing) {
             ongoing.push(campaign);
           } else {
@@ -128,17 +150,16 @@ const GradeTopics = () => {
     fetchCampaigns();
   };
 
-  const showGradeModal = async (record) => {
-    setGradingTopic(record);
+  const showGradeModal = async (record, round) => {
+    setGradingTopic({ ...record, score_level: round.score_level });
     try {
       // Lấy đúng vòng thi mà giám khảo được phân công (score_level) thay vì vòng thi hiện tại của đề tài (round_status)
-      const response = await api.get(`/scores/my-score/${record.id}?level=${record.score_level || record.round_status}`);
-      if (response.data) {
+      const response = await api.get(`/scores/my-score/${record.id}?level=${round.score_level}`);
+      const scoreData = response.data?.data || response.data;
+      if (scoreData) {
         form.setFieldsValue({
-          urgency_score: response.data.urgency_score,
-          method_score: response.data.method_score,
-          result_score: response.data.result_score,
-          comment: response.data.comment
+          total_score: scoreData.total_score ?? scoreData.result_score,
+          comment: scoreData.comment
         });
       } else {
         form.resetFields();
@@ -154,19 +175,21 @@ const GradeTopics = () => {
       await api.post('/scores', {
         topic_id: gradingTopic.id,
         level: gradingTopic.score_level || gradingTopic.round_status,
-        ...values
+        total_score: values.total_score,
+        comment: values.comment
       });
+
       message.success('Đã lưu điểm số thành công!');
       setIsGradeModalVisible(false);
       
       // Cập nhật trạng thái của đề tài vừa chấm ngay trên giao diện
-      // thay vì điều hướng về trang danh sách, giúp cải thiện trải nghiệm người dùng.
-      const newTotalScore = (values.urgency_score || 0) + (values.method_score || 0) + (values.result_score || 0);
+      const newTotalScore = values.total_score;
 
       setTopics(prevTopics =>
         prevTopics.map(topic => {
-          if (topic.key === gradingTopic.key) {
-            return { ...topic, total_score: newTotalScore };
+          if (topic.id === gradingTopic.id) {
+            const updatedRounds = topic.rounds.map(r => r.score_level === gradingTopic.score_level ? { ...r, total_score: newTotalScore } : r);
+            return { ...topic, rounds: updatedRounds };
           }
           return topic;
         })
@@ -181,8 +204,21 @@ const GradeTopics = () => {
     setDetailsModalVisible(true);
     setLoadingDocs(true);
     try {
-      const response = await api.get('/reports');
-      const reports = (response.data || []).filter(r => r.topic_id === record.id);
+      // Lấy chi tiết điểm và nhận xét của giám khảo
+      try {
+        const detailsResponse = await api.get(`/topics/${record.id}/details`);
+        setSelectedTopic(prev => ({ ...prev, scores: detailsResponse.data?.scores }));
+      } catch (err) {}
+
+      // Tối ưu: Chỉ fetch các báo cáo của đề tài đang chọn
+      const response = await api.get('/reports', { params: { topic_id: record.id } });
+      
+      // Bóc tách dữ liệu linh hoạt, vì API có thể trả về mảng trực tiếp hoặc object { data: [...] }
+      let reportsData = [];
+      if (Array.isArray(response)) reportsData = response;
+      else if (response?.data && Array.isArray(response.data)) reportsData = response.data;
+      else if (response?.data?.data && Array.isArray(response.data.data)) reportsData = response.data.data;
+      const reports = reportsData; // API đã được filter ở backend
       const formattedDocs = [];
       
       reports.forEach(report => {
@@ -218,23 +254,31 @@ const GradeTopics = () => {
       title: 'Tên đợt thi', 
       dataIndex: 'name', 
       key: 'name',
+      width: 300,
       render: (text) => <b>{text}</b>
     },
     { 
       title: 'Năm học', 
       dataIndex: 'academic_year', 
-      key: 'academic_year' 
+      key: 'academic_year',
+      width: 140
     },
     { 
       title: 'Số lượng đề tài', 
       key: 'topic_count',
-      render: (_, record) => <Tag color="blue">{record.topics.length} đề tài</Tag>
+      width: 160,
+      align: 'center',
+      render: (_, record) => <Tag color="blue" style={{ margin: 0 }}>{record.topics.length} đề tài</Tag>
     },
     {
       title: 'Hành động',
       key: 'action',
+      fixed: 'right',
+      width: 160,
+      align: 'center',
       render: (_, record) => (
         <Button 
+          size="small"
           type="primary" 
           icon={<EyeOutlined />}
           onClick={() => handleViewTopics(record)}
@@ -245,15 +289,20 @@ const GradeTopics = () => {
     },
   ];
 
+  const getVisibleRounds = (record) => {
+    if (levelFilter === 'all') return record.rounds || [];
+    return (record.rounds || []).filter(r => Number(r.score_level) === Number(levelFilter));
+  };
+
   const topicColumns = [
     { 
       title: 'Tên đề tài', 
       dataIndex: 'title', 
       key: 'title',
-      width: '25%', 
+      width: 300, 
       render: (text, record) => (
         <div>
-          <Text strong>{text}</Text>
+          <Text strong style={{ display: 'block', whiteSpace: 'normal', minWidth: 200 }}>{text}</Text>
           <div style={{ fontSize: '12px', color: '#8c8c8c', marginTop: '4px' }}>Đợt thi: {record.campaign_name}</div>
         </div>
       )
@@ -261,25 +310,34 @@ const GradeTopics = () => {
     { 
       title: 'Sinh viên thực hiện', 
       dataIndex: 'student_name', 
-      key: 'student_name' 
+      key: 'student_name',
+      width: 180
     },
     { 
       title: 'Giảng viên HD', 
       dataIndex: 'instructor_name', 
-      key: 'instructor_name' 
+      key: 'instructor_name',
+      width: 180
     },
     { 
       title: 'Vòng chấm của bạn', 
-      key: 'score_level',
+      key: 'rounds',
+      width: 140,
+      align: 'center',
       render: (_, record) => {
-        const level = record.score_level || record.round_status;
-        return <Tag color={level === 1 ? 'magenta' : 'geekblue'}>{level === 1 ? 'VÒNG KHOA' : 'VÒNG TRƯỜNG'}</Tag>;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
+            {getVisibleRounds(record).map(r => <Tag key={r.score_level} color={r.score_level === 1 ? 'magenta' : 'geekblue'} style={{ margin: 0 }}>{r.score_level === 1 ? 'VÒNG KHOA' : 'VÒNG TRƯỜNG'}</Tag>)}
+          </div>
+        );
       }
     },
     { 
       title: 'Trạng thái đề tài',
       dataIndex: 'status',
       key: 'status',
+      width: 160,
+      align: 'center',
       render: (status, record) => {
         const statusMap = {
           pending: { color: 'orange', text: 'Chờ duyệt' },
@@ -291,39 +349,49 @@ const GradeTopics = () => {
           rejected: { color: 'red', text: 'Từ chối' },
         };
         
-        if (status === 'grading' && record.total_score != null) {
-          return <Tag color="geekblue">ĐÃ CHẤM</Tag>;
+        const visibleRounds = getVisibleRounds(record);
+        if (status === 'grading' && visibleRounds.length > 0 && visibleRounds.every(r => r.total_score != null)) {
+          return <Tag color="geekblue" style={{ margin: 0 }}>ĐÃ CHẤM</Tag>;
         }
         
         const { color, text } = statusMap[status] || { color: 'default', text: status };
-        return <Tag color={color}>{text.toUpperCase()}</Tag>;
+        return <Tag color={color} style={{ margin: 0 }}>{text.toUpperCase()}</Tag>;
       }
     },
     { 
-      title: 'Điểm của bạn', key: 'total_score', width: '15%',
+      title: 'Điểm của bạn', key: 'total_score', width: 120,
+      align: 'center',
       render: (_, record) => (
-        record.total_score != null 
-          ? <Tag color={Number(record.total_score) >= 70 ? "green" : "red"}>{record.total_score} / 100</Tag>
-          : <Tag color="default">Chưa chấm</Tag>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
+          {getVisibleRounds(record).map(r => r.total_score != null 
+            ? <Tag key={r.score_level} color={Number(r.total_score) >= 50 ? "green" : "red"} style={{ margin: 0, fontWeight: 'bold', fontSize: '13px' }}>{parseFloat(r.total_score)} / 100</Tag>
+            : <Tag key={r.score_level} color="default" style={{ margin: 0 }}>Chưa chấm</Tag>)}
+        </div>
       )
     },
     {
       title: 'Thao tác',
       key: 'action',
+      fixed: 'right',
+      width: 220,
+      align: 'center',
       render: (_, record) => (
-        <Space direction="vertical" size="small">
-          <Button icon={<InfoCircleOutlined />} onClick={() => showDetailsModal(record)}>
-            Chi tiết & Báo cáo
-          </Button>
-          <Button 
-            type="primary" 
-            icon={<EditOutlined />} 
-            onClick={() => showGradeModal(record)}
-            disabled={record.status !== 'grading'}
-          >
-            {record.total_score != null ? 'Sửa điểm' : 'Chấm điểm'}
-          </Button>
-        </Space>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center' }}>
+          {getVisibleRounds(record).map(r => (
+            <Button 
+              key={r.score_level}
+              size="small"
+              type={r.total_score != null ? "default" : "primary"} 
+              icon={<EditOutlined />} 
+              onClick={() => showGradeModal(record, r)}
+              disabled={record.status !== 'grading'}
+              style={{ fontSize: '12px' }}
+            >
+              {r.total_score != null ? `Sửa V${r.score_level}` : `Chấm V${r.score_level}`}
+            </Button>
+          ))}
+          <Button size="small" icon={<EyeOutlined />} onClick={() => showDetailsModal(record)} style={{ fontSize: '12px' }}>Chi tiết</Button>
+        </div>
       ),
     },
   ];
@@ -334,31 +402,37 @@ const GradeTopics = () => {
         <>
           <Title level={3} style={{ marginBottom: 20, color: '#1890ff' }}>Đợt thi đang diễn ra (Cần chấm)</Title>
           <Table 
+            size="small"
             columns={campaignColumns} 
             dataSource={ongoingCampaigns} 
             rowKey="id" 
             loading={loading}
             pagination={{ pageSize: 5, hideOnSinglePage: true }}
+            scroll={{ x: 'max-content' }}
             locale={{ emptyText: 'Không có đợt thi nào đang chờ bạn chấm.' }}
           />
           <Divider />
           <Title level={3} style={{ marginTop: 20, marginBottom: 20, color: '#595959' }}>Đợt thi đã chấm xong</Title>
           <Table 
+            size="small"
             columns={campaignColumns} 
             dataSource={gradedCampaigns} 
             rowKey="id" 
             loading={loading}
             pagination={{ pageSize: 5, hideOnSinglePage: true }}
+            scroll={{ x: 'max-content' }}
             locale={{ emptyText: 'Chưa có đợt thi nào được bạn chấm hoàn tất.' }}
           />
           <Divider />
           <Title level={3} style={{ marginTop: 20, marginBottom: 20, color: '#52c41a' }}>Đợt thi đã hoàn thành</Title>
           <Table 
+            size="small"
             columns={campaignColumns} 
             dataSource={completedCampaigns} 
             rowKey="id" 
             loading={loading}
             pagination={{ pageSize: 5, hideOnSinglePage: true }}
+            scroll={{ x: 'max-content' }}
             locale={{ emptyText: 'Chưa có đợt thi nào hoàn thành.' }}
           />
         </>
@@ -368,21 +442,28 @@ const GradeTopics = () => {
             Quay lại danh sách đợt thi
           </Button>
           
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
-              Đề tài thuộc đợt thi: {selectedCampaign?.name}
-            </Title>
-            <Select value={levelFilter} onChange={setLevelFilter} style={{ width: 180 }}>
-              <Option value="all">Tất cả các vòng</Option>
-              <Option value={1}>Vòng Khoa (Sơ khảo)</Option>
-              <Option value={2}>Vòng Trường (Chung khảo)</Option>
-            </Select>
+          <div style={{ background: '#fafafa', padding: '16px', borderRadius: '8px', marginBottom: 24 }}>
+            <Row gutter={[16, 16]} align="middle" justify="space-between">
+              <Col>
+                <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
+                  Đề tài thuộc đợt thi: {selectedCampaign?.name}
+                </Title>
+              </Col>
+              <Col>
+                <Select value={levelFilter} onChange={setLevelFilter} style={{ width: 180 }}>
+                  <Option value="all">Tất cả các vòng</Option>
+                  <Option value={1}>Vòng Khoa (Sơ khảo)</Option>
+                  <Option value={2}>Vòng Trường (Chung khảo)</Option>
+                </Select>
+              </Col>
+            </Row>
           </div>
           
           <Title level={4} style={{ marginTop: 24, marginBottom: 16, color: '#fa8c16' }}>
             Đề tài cần chấm ({ungradedTopics.length})
           </Title>
           <Table 
+            size="small"
             columns={topicColumns} 
             dataSource={ungradedTopics} 
             rowKey="key"
@@ -398,6 +479,7 @@ const GradeTopics = () => {
             Đề tài đã chấm ({gradedTopicsInCampaign.length})
           </Title>
           <Table 
+            size="small"
             columns={topicColumns} 
             dataSource={gradedTopicsInCampaign} 
             rowKey="key"
@@ -413,6 +495,7 @@ const GradeTopics = () => {
             Đề tài hoàn thành ({completedTopicsInCampaign.length})
           </Title>
           <Table 
+            size="small"
             columns={topicColumns} 
             dataSource={completedTopicsInCampaign} 
             rowKey="key"
@@ -433,49 +516,16 @@ const GradeTopics = () => {
         cancelText="Hủy"
         width={600}
       >
-        <div style={{ marginBottom: 20, padding: 10, background: '#f5f5f5', borderRadius: 8 }}>
-          <Text strong>Khung tiêu chí đánh giá (Tổng 100đ):</Text>
-          <ul>
-            <li>Tính cấp thiết & Sáng tạo: Tối đa 20đ</li>
-            <li>Phương pháp nghiên cứu: Tối đa 30đ</li>
-            <li>Kết quả & Đóng góp thực tiễn: Tối đa 50đ</li>
-          </ul>
+        <div style={{ marginBottom: 20, padding: 12, background: '#e6f7ff', borderRadius: 8, border: '1px solid #91d5ff' }}>
+          <Text strong style={{ color: '#0050b3' }}>Hướng dẫn nhập điểm:</Text>
+          <p style={{ margin: 0, marginTop: 4 }}>Thư ký Hội đồng tổng hợp điểm từ các thành viên Ban giám khảo, tính điểm trung bình và chỉ nhập <b>1 Tổng điểm cuối cùng</b> vào hệ thống.</p>
         </div>
         <Form form={form} layout="vertical" onFinish={handleSubmitScore}>
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item label="Tính cấp thiết" name="urgency_score" rules={[{ required: true, message: 'Nhập điểm!' }]}>
-                <InputNumber min={0} max={20} style={{ width: '100%' }} placeholder="Tối đa 20" />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item label="Phương pháp" name="method_score" rules={[{ required: true, message: 'Nhập điểm!' }]}>
-                <InputNumber min={0} max={30} style={{ width: '100%' }} placeholder="Tối đa 30" />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item label="Kết quả đạt được" name="result_score" rules={[{ required: true, message: 'Nhập điểm!' }]}>
-                <InputNumber min={0} max={50} style={{ width: '100%' }} placeholder="Tối đa 50" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item 
-            shouldUpdate={(prevValues, currentValues) => 
-              prevValues.urgency_score !== currentValues.urgency_score || 
-              prevValues.method_score !== currentValues.method_score || 
-              prevValues.result_score !== currentValues.result_score
-            }
-          >
-            {({ getFieldValue }) => {
-              const urgency = getFieldValue('urgency_score') || 0;
-              const method = getFieldValue('method_score') || 0;
-              const result = getFieldValue('result_score') || 0;
-              const total = urgency + method + result;
-              return <div style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '16px' }}>Tổng điểm: <span style={{ color: total >= 70 ? 'green' : 'red' }}>{total} / 100</span></div>;
-            }}
+          <Form.Item label="Tổng điểm trung bình (Tối đa 100)" name="total_score" rules={[{ required: true, message: 'Vui lòng nhập tổng điểm!' }]}>
+            <InputNumber min={0} max={100} style={{ width: '100%' }} placeholder="Nhập điểm trung bình cuối cùng (0 - 100)" size="large" />
           </Form.Item>
-          <Form.Item label="Nhận xét / Phản biện" name="comment">
-            <TextArea rows={4} placeholder="Nhập nhận xét của bạn về đề tài này..." />
+          <Form.Item label="Nhận xét / Phản biện chung" name="comment">
+            <TextArea rows={4} placeholder="Nhập tóm tắt nhận xét của Hội đồng về đề tài này..." />
           </Form.Item>
         </Form>
       </Modal>
@@ -517,6 +567,25 @@ const GradeTopics = () => {
               {selectedTopic.description}
             </div>
             
+            {selectedTopic.scores && selectedTopic.scores.length > 0 && (
+              <>
+                <Divider orientation="left">Điểm & Nhận xét của Hội đồng</Divider>
+                <Table 
+                  dataSource={selectedTopic.scores} 
+                  pagination={false} 
+                  size="small"
+                  rowKey={(r) => `${r.council_member_id}-${r.level}`}
+                  bordered
+                  columns={[
+                    { title: 'Vòng thi', dataIndex: 'level', render: l => <Tag color={l === 1 ? 'magenta' : 'geekblue'}>{l === 1 ? 'Vòng Khoa' : 'Vòng Trường'}</Tag>, width: 110, align: 'center' },
+                    { title: 'Giám khảo', dataIndex: 'council_name', width: 160, render: name => <Text strong>{name}</Text> },
+                    { title: 'Điểm số', dataIndex: 'total_score', render: s => s != null ? <Tag color={Number(s) >= 50 ? 'green' : 'red'}><b>{parseFloat(s)}</b></Tag> : <Text type="secondary">Chưa chấm</Text>, width: 90, align: 'center' },
+                    { title: 'Nhận xét', dataIndex: 'comment', render: c => c ? <div style={{ whiteSpace: 'pre-wrap' }}>{c}</div> : <Text type="secondary">Không có nhận xét</Text> }
+                  ]}
+                />
+              </>
+            )}
+
             <Divider orientation="left">Tài liệu đính kèm (Báo cáo)</Divider>
             <List
               loading={loadingDocs}

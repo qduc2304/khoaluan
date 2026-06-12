@@ -116,7 +116,7 @@ async function testSeedUsers() {
       log.info('    - ID 2: Chuyên Viên (specialist)');
       log.info('    - ID 3: Giảng Viên (instructor)');
       log.info('    - ID 4: Sinh Viên (student)');
-      log.info('    - ID 5: Thành Viên Hội Đồng (council)');
+      log.info('    - ID 5: Thư ký Hội đồng (council)');
       log.info('  All passwords: 123456');
       return true;
     } else {

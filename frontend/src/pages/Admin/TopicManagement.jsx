@@ -1,4 +1,4 @@
-import { CheckCircleOutlined, DeleteOutlined, EditOutlined, FileOutlined, InfoCircleOutlined, SearchOutlined, UsergroupAddOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, CheckOutlined, CloseOutlined, DeleteOutlined, EditOutlined, FileOutlined, RollbackOutlined, SearchOutlined, StarOutlined, ThunderboltOutlined, UsergroupAddOutlined } from '@ant-design/icons';
 import { Button, Card, Col, Divider, Form, Input, InputNumber, List, message, Modal, Popconfirm, Row, Select, Space, Table, Tag, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import api from '../../services/api';
@@ -18,6 +18,7 @@ const TopicManagement = ({ campaignId }) => {
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [fundingStatusFilter, setFundingStatusFilter] = useState('all');
+  const [roundStatusFilter, setRoundStatusFilter] = useState('all');
 
   // States cho modal yêu cầu chỉnh sửa
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -82,9 +83,14 @@ const TopicManagement = ({ campaignId }) => {
       const matchName = topic.title.toLowerCase().includes(searchText.toLowerCase());
       const matchStatus = statusFilter === 'all' || topic.status === statusFilter;
       const matchFundingStatus = fundingStatusFilter === 'all' || topic.funding_status === fundingStatusFilter;
-      return matchName && matchStatus && matchFundingStatus;
+      const matchRoundStatus = roundStatusFilter === 'all' || Number(topic.round_status) === roundStatusFilter;
+      return matchName && matchStatus && matchFundingStatus && matchRoundStatus;
     });
-  }, [topics, searchText, statusFilter, fundingStatusFilter]);
+  }, [topics, searchText, statusFilter, fundingStatusFilter, roundStatusFilter]);
+
+  const handleTagClick = (round) => {
+    setRoundStatusFilter(prev => prev === round ? 'all' : round);
+  };
 
   const handleUpdateStatus = async (id, newStatus, successMsg, extraData = {}) => {
     try {
@@ -119,6 +125,46 @@ const TopicManagement = ({ campaignId }) => {
     }
     handleUpdateStatus(currentTopicId, 'revision_requested', 'Đã yêu cầu sinh viên chỉnh sửa!', { revision_reason: revisionReason });
     setIsModalVisible(false);
+  };
+
+  const handleAutoChotDiem = async () => {
+    if (!topics || topics.length === 0) return;
+    
+    // Lọc các đề tài đang ở Vòng Khoa, trạng thái đang chấm và đã có điểm TB
+    const eligibleTopics = topics.filter(t => t.round_status === 1 && t.status === 'grading' && t.average_score != null);
+    
+    if (eligibleTopics.length === 0) {
+      message.warning('Không có đề tài nào đủ điều kiện (Phải ở Vòng Khoa, Đang chấm và Đã có điểm)!');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const passedTopics = [];
+      const failedTopics = [];
+
+      // Phân loại đề tài theo mốc điểm 50
+      eligibleTopics.forEach(t => {
+        if (parseFloat(t.average_score) >= 50) {
+          passedTopics.push(t);
+        } else {
+          failedTopics.push(t);
+        }
+      });
+
+      // Cập nhật lên API
+      const updatePromises = [];
+      passedTopics.forEach(t => updatePromises.push(topicService.updateTopicStatus(t.id, { round_status: 2, status: 'approved', average_score: null })));
+      failedTopics.forEach(t => updatePromises.push(topicService.updateTopicStatus(t.id, { round_status: 0, status: 'completed' })));
+
+      await Promise.all(updatePromises);
+      message.success(`Đã chốt điểm! ${passedTopics.length} đề tài lên Vòng Trường (>=50đ), ${failedTopics.length} đề tài dừng ở Khoa (<50đ).`);
+      fetchTopics();
+    } catch (error) {
+      message.error('Lỗi khi tự động chốt điểm và chuyển vòng!');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const showUpdateModal = (record) => {
@@ -183,8 +229,21 @@ const TopicManagement = ({ campaignId }) => {
     setDetailsModalVisible(true);
     setLoadingDocs(true);
     try {
-      const response = await api.get('/reports');
-      const reports = (response.data || []).filter(r => r.topic_id === record.id);
+      // Lấy chi tiết điểm và nhận xét của giám khảo
+      try {
+        const detailsResponse = await topicService.getTopicDetails(record.id);
+        setSelectedTopic(prev => ({ ...prev, scores: detailsResponse.scores }));
+      } catch (err) {}
+
+      // Tối ưu: Chỉ fetch các báo cáo của đề tài đang chọn
+      const response = await api.get('/reports', { params: { topic_id: record.id } });
+
+      // Bóc tách dữ liệu linh hoạt, vì API có thể trả về mảng trực tiếp hoặc object { data: [...] }
+      let reportsData = [];
+      if (Array.isArray(response)) reportsData = response;
+      else if (response?.data && Array.isArray(response.data)) reportsData = response.data;
+      else if (response?.data?.data && Array.isArray(response.data.data)) reportsData = response.data.data;
+      const reports = reportsData; // API đã được filter ở backend
       const formattedDocs = [];
       
       reports.forEach(report => {
@@ -220,7 +279,7 @@ const TopicManagement = ({ campaignId }) => {
       title: 'Tên đề tài', 
       dataIndex: 'title', 
       key: 'title',
-      width: '25%', 
+      width: 280, 
       render: (text, record) => (
         <>
           <Text strong>{text}</Text><br/>
@@ -232,7 +291,7 @@ const TopicManagement = ({ campaignId }) => {
       title: 'Nhóm thực hiện', 
       dataIndex: 'student_name', 
       key: 'student_name',
-      width: '20%',
+      width: 240,
       render: (_, record) => (
         <div style={{ fontSize: '12px' }}>
           <Text strong>Nhóm trưởng: {record.student_name}</Text><br/>
@@ -250,16 +309,16 @@ const TopicManagement = ({ campaignId }) => {
       )
     },
     {
-      title: 'Giảng viên hướng dẫn',
+      title: 'GVHD',
       dataIndex: 'instructor_name',
       key: 'instructor_name',
-      width: '15%',
+      width: 160,
     },
     {
       title: 'Kinh phí',
       dataIndex: 'funding',
       key: 'funding',
-      width: '10%',
+      width: 130,
       render: (funding, record) => {
         if (!funding) return <Text type="secondary">Chưa cấp</Text>;
         const statusMap = {
@@ -281,7 +340,7 @@ const TopicManagement = ({ campaignId }) => {
       title: 'Vòng thi',
       key: 'round_status',
       dataIndex: 'round_status',
-      width: '10%',
+      width: 120,
       render: (round) => {
         const map = {
           1: { color: 'cyan', text: 'Cấp Khoa' },
@@ -294,20 +353,20 @@ const TopicManagement = ({ campaignId }) => {
       }
     },
     {
-      title: 'Điểm TB',
+      title: 'Điểm',
       dataIndex: 'average_score',
       key: 'average_score',
-      width: '10%',
+      width: 90,
       render: (score, record) => {
         if (record.status === 'approved') return <Text type="secondary">Chưa chấm</Text>;
-        return score ? <Tag color="purple"><b>{parseFloat(score).toFixed(2)}</b></Tag> : <Text type="secondary">Chưa chấm</Text>;
+        return score != null ? <Tag color="purple"><b>{parseFloat(score).toFixed(2)}</b></Tag> : <Text type="secondary">Chưa chấm</Text>;
       },
     },
     {
       title: 'Trạng thái',
       key: 'status',
       dataIndex: 'status',
-      width: '15%',
+      width: 150,
       render: (status, record) => {
         const statusMap = {
           pending: { color: 'orange', text: 'Chờ duyệt' },
@@ -326,46 +385,53 @@ const TopicManagement = ({ campaignId }) => {
       title: 'Hành động',
       key: 'action',
       fixed: 'right',
-      width: '30%',
+      width: 220,
       render: (_, record) => {
         const canAction = record.status === 'pending' || record.status === 'instructor_approved';
         const canAssign = record.status === 'approved' || record.status === 'grading';
+        const btnStyle = { fontSize: '12px', padding: '0 8px', height: '24px' };
         return (
-          <Space size="small" wrap>
-            <Button icon={<InfoCircleOutlined />} onClick={() => showDetailsModal(record)}>
-              Chi tiết
-            </Button>
-            <Button type="dashed" icon={<EditOutlined />} onClick={() => showUpdateModal(record)}>
-              Cập nhật & KP
-            </Button>
-            {['director', 'specialist'].includes(role) && (
-              <Popconfirm title="Xóa đề tài này vĩnh viễn?" onConfirm={() => handleDeleteTopic(record.id)} okText="Xóa" cancelText="Hủy">
-                <Button danger icon={<DeleteOutlined />} />
-              </Popconfirm>
-            )}
-            {String(record.funding_status).toLowerCase().trim() === 'proposed' && (
-              <>
-                <Button size="small" type="primary" style={{ backgroundColor: role === 'director' ? '#52c41a' : undefined, borderColor: role === 'director' ? '#52c41a' : undefined }} onClick={() => handleUpdateStatus(record.id, record.status, 'Đã duyệt kinh phí thành công!', { funding_status: 'approved' })} disabled={role !== 'director'} title={role !== 'director' ? "Chỉ Giám đốc mới có quyền duyệt" : ""}>Duyệt KP</Button>
-                <Button size="small" type="primary" danger onClick={() => handleUpdateStatus(record.id, record.status, 'Đã từ chối kinh phí!', { funding_status: 'rejected' })} disabled={role !== 'director'} title={role !== 'director' ? "Chỉ Giám đốc mới có quyền duyệt" : ""}>Từ chối KP</Button>
-              </>
-            )}
-            <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => handleUpdateStatus(record.id, 'approved', 'Đã phê duyệt đề tài thành công!')} disabled={!canAction}>Duyệt</Button>
-            <Button icon={<EditOutlined />} onClick={() => showRevisionModal(record.id)} disabled={!canAction}>Yêu cầu sửa</Button>
-            {canAssign && (
-              <Button type="dashed" icon={<UsergroupAddOutlined />} onClick={() => showAssignModal(record.id)}>
-                Phân công
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+              <Button size="small" style={btnStyle} icon={<SearchOutlined />} onClick={() => showDetailsModal(record)}>
+                Chi tiết
               </Button>
-            )}
-            {record.status === 'grading' && record.round_status === 1 && (
-              <>
-                <Button size="small" style={{ color: '#eb2f96', borderColor: '#eb2f96' }} onClick={() => handleUpdateStatus(record.id, 'approved', 'Đã chuyển đề tài lên Vòng Trường!', { round_status: 2, average_score: null })}>Lên Vòng Trường</Button>
-                <Button size="small" danger onClick={() => handleUpdateStatus(record.id, 'completed', 'Đề tài đã dừng ở Vòng Khoa.', { round_status: 0 })}>Dừng ở Khoa</Button>
-              </>
-            )}
-            {record.status === 'grading' && record.round_status === 2 && (
-              <Button size="small" type="primary" onClick={() => handleUpdateStatus(record.id, 'completed', 'Đề tài đã hoàn thành xuất sắc!', { round_status: 3 })}>Hoàn thành</Button>
-            )}
-          </Space>
+              <Button size="small" style={btnStyle} type="dashed" icon={<EditOutlined />} onClick={() => showUpdateModal(record)}>
+                Cập nhật
+              </Button>
+              {['director', 'specialist'].includes(role) && (
+                <Popconfirm title="Xóa đề tài này vĩnh viễn?" onConfirm={() => handleDeleteTopic(record.id)} okText="Xóa" cancelText="Hủy">
+                  <Button size="small" style={{ ...btnStyle, padding: '0 4px' }} danger icon={<DeleteOutlined />} />
+                </Popconfirm>
+              )}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+              {String(record.funding_status).toLowerCase().trim() === 'proposed' && (
+                <>
+                  <Button size="small" style={{ ...btnStyle, backgroundColor: role === 'director' ? '#52c41a' : undefined, borderColor: role === 'director' ? '#52c41a' : undefined }} type="primary" icon={<CheckOutlined />} onClick={() => handleUpdateStatus(record.id, record.status, 'Đã duyệt kinh phí thành công!', { funding_status: 'approved' })} disabled={role !== 'director'} title={role !== 'director' ? "Chỉ Giám đốc mới có quyền duyệt" : ""}>Duyệt KP</Button>
+                  <Button size="small" style={btnStyle} type="primary" danger icon={<CloseOutlined />} onClick={() => handleUpdateStatus(record.id, record.status, 'Đã từ chối kinh phí!', { funding_status: 'rejected' })} disabled={role !== 'director'} title={role !== 'director' ? "Chỉ Giám đốc mới có quyền duyệt" : ""}>Từ chối</Button>
+                </>
+              )}
+              <Button size="small" style={btnStyle} type="primary" icon={<CheckCircleOutlined />} onClick={() => handleUpdateStatus(record.id, 'approved', 'Đã phê duyệt đề tài thành công!')} disabled={!canAction}>Duyệt</Button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+              <Button size="small" style={btnStyle} icon={<RollbackOutlined />} onClick={() => showRevisionModal(record.id)} disabled={!canAction}>Yêu cầu sửa</Button>
+              {canAssign && (
+                <Button 
+                  size="small" 
+                  style={{ ...btnStyle, ...(record.status === 'grading' ? { color: '#52c41a', borderColor: '#52c41a', backgroundColor: '#f6ffed' } : {}) }} 
+                  type={record.status === 'grading' ? "default" : "dashed"} 
+                  icon={<UsergroupAddOutlined />} 
+                  onClick={() => showAssignModal(record.id)}
+                >
+                  {record.status === 'grading' ? 'Đã phân công' : 'Phân công'}
+                </Button>
+              )}
+              {record.status === 'grading' && record.round_status === 2 && (
+                <Button size="small" style={btnStyle} type="primary" icon={<StarOutlined />} onClick={() => handleUpdateStatus(record.id, 'completed', 'Đề tài đã hoàn thành xuất sắc!', { round_status: 3 })}>Hoàn thành</Button>
+              )}
+            </div>
+          </div>
         );
       },
     },
@@ -373,9 +439,11 @@ const TopicManagement = ({ campaignId }) => {
 
   const content = (
     <>
-      {!campaignId && <Title level={3} style={{ marginBottom: '20px', color: '#1890ff' }}>Quản lý Đề tài Nghiên cứu Khoa học</Title>}
+      {!campaignId && <Title level={4} style={{ marginBottom: '16px', color: '#1890ff' }}>Quản lý Đề tài Nghiên cứu Khoa học</Title>}
+      {campaignId && <Title level={5} style={{ marginBottom: '12px', color: '#1890ff' }}>Quản lý đề tài tham gia</Title>}
       
-      <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+      <div style={{ background: '#fafafa', padding: '12px', borderRadius: '8px', marginBottom: 16 }}>
+        <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} md={10}>
           <Input 
             placeholder="Tìm kiếm theo tên đề tài..." 
@@ -418,8 +486,58 @@ const TopicManagement = ({ campaignId }) => {
           </Col>
         )}
       </Row>
+    </div>
 
-      <Table columns={columns} dataSource={filteredTopics} loading={loading} pagination={{ pageSize: 10 }} bordered scroll={{ x: 'max-content' }} />
+      {campaignId && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '12px' }}>
+          <Space size="small" wrap>
+            <Tag 
+              color="cyan" 
+              style={{ borderRadius: '12px', padding: '2px 8px', cursor: 'pointer', transition: 'opacity 0.3s', opacity: roundStatusFilter !== 'all' && roundStatusFilter !== 1 ? 0.4 : 1 }}
+              onClick={() => handleTagClick(1)}
+            >
+              Vòng Khoa: {topics.filter(t => Number(t.round_status) === 1).length}
+            </Tag>
+            <Tag 
+              color="magenta" 
+              style={{ borderRadius: '12px', padding: '2px 8px', cursor: 'pointer', transition: 'opacity 0.3s', opacity: roundStatusFilter !== 'all' && roundStatusFilter !== 2 ? 0.4 : 1 }}
+              onClick={() => handleTagClick(2)}
+            >
+              Vòng Trường: {topics.filter(t => Number(t.round_status) === 2).length}
+            </Tag>
+            <Tag 
+              color="gold" 
+              style={{ borderRadius: '12px', padding: '2px 8px', cursor: 'pointer', transition: 'opacity 0.3s', opacity: roundStatusFilter !== 'all' && roundStatusFilter !== 3 ? 0.4 : 1 }}
+              onClick={() => handleTagClick(3)}
+            >
+              Hoàn thành: {topics.filter(t => Number(t.round_status) === 3).length}
+            </Tag>
+            <Tag 
+              color="default" 
+              style={{ borderRadius: '12px', padding: '2px 8px', cursor: 'pointer', transition: 'opacity 0.3s', opacity: roundStatusFilter !== 'all' && roundStatusFilter !== 0 ? 0.4 : 1 }}
+              onClick={() => handleTagClick(0)}
+            >
+              Dừng ở Khoa: {topics.filter(t => Number(t.round_status) === 0).length}
+            </Tag>
+          </Space>
+          
+          {['director', 'specialist'].includes(role) && (
+            <Popconfirm
+              title="Tự động chốt điểm và chuyển vòng?"
+              description="Đề tài >= 50 điểm sẽ lên Vòng Trường (được reset điểm để chấm lại). Đề tài < 50 điểm sẽ Dừng ở Khoa. Bạn có chắc chắn?"
+              onConfirm={handleAutoChotDiem}
+              okText="Thực hiện"
+              cancelText="Hủy"
+            >
+              <Button type="primary" icon={<ThunderboltOutlined />} style={{ background: '#0050b3', fontWeight: 500 }}>
+                Chốt điểm & Chuyển vòng (Tự động)
+              </Button>
+            </Popconfirm>
+          )}
+        </div>
+      )}
+
+      <Table size="small" columns={columns} dataSource={filteredTopics} loading={loading} pagination={{ pageSize: 10 }} bordered scroll={{ x: 'max-content' }} />
       
       <Modal
         title="Yêu cầu chỉnh sửa đề tài"
@@ -564,9 +682,9 @@ const TopicManagement = ({ campaignId }) => {
 
           return footerButtons;
         }}
-        width="95vw"
-        style={{ top: 20 }}
-        bodyStyle={{ height: '85vh', overflowY: 'auto' }}
+        width={1000}
+        style={{ top: 30 }}
+        bodyStyle={{ maxHeight: '80vh', overflowY: 'auto' }}
       >
         {selectedTopic && (
           <div>
@@ -601,6 +719,25 @@ const TopicManagement = ({ campaignId }) => {
               {selectedTopic.description}
             </div>
             
+            {selectedTopic.scores && selectedTopic.scores.length > 0 && (
+              <>
+                <Divider orientation="left">Điểm & Nhận xét của Hội đồng</Divider>
+                <Table 
+                  dataSource={selectedTopic.scores} 
+                  pagination={false} 
+                  size="small"
+                  rowKey={(r) => `${r.council_member_id}-${r.level}`}
+                  bordered
+                  columns={[
+                    { title: 'Vòng thi', dataIndex: 'level', render: l => <Tag color={l === 1 ? 'magenta' : 'geekblue'}>{l === 1 ? 'Vòng Khoa' : 'Vòng Trường'}</Tag>, width: 110, align: 'center' },
+                    { title: 'Giám khảo', dataIndex: 'council_name', width: 160, render: name => <Text strong>{name}</Text> },
+                    { title: 'Điểm số', dataIndex: 'total_score', render: s => s != null ? <Tag color={Number(s) >= 50 ? 'green' : 'red'}><b>{parseFloat(s)}</b></Tag> : <Text type="secondary">Chưa chấm</Text>, width: 90, align: 'center' },
+                    { title: 'Nhận xét', dataIndex: 'comment', render: c => c ? <div style={{ whiteSpace: 'pre-wrap' }}>{c}</div> : <Text type="secondary">Không có nhận xét</Text> }
+                  ]}
+                />
+              </>
+            )}
+
             <Divider orientation="left">Tài liệu đính kèm (Báo cáo)</Divider>
             <List
               loading={loadingDocs}

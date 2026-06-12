@@ -1,6 +1,6 @@
 import { DownloadOutlined, EditOutlined, TeamOutlined } from '@ant-design/icons';
 import { Button, Card, Col, DatePicker, Form, InputNumber, message, Modal, Row, Select, Space, Table, Tag, Typography } from 'antd';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import api from '../../services/api';
 import { campaignService } from '../../services/campaignService';
 import { topicService } from '../../services/topicService';
@@ -51,6 +51,17 @@ const FacultyTopicManagement = () => {
   // States cho chức năng lọc
   const [filterForm] = Form.useForm();
   const [campaigns, setCampaigns] = useState([]);
+  const [roundStatusFilter, setRoundStatusFilter] = useState('all');
+
+  // Thống kê số lượng đề tài
+  const topicStats = useMemo(() => {
+    return {
+      round1: topics.filter(t => Number(t.round_status) === 1).length,
+      round2: topics.filter(t => Number(t.round_status) === 2).length,
+      completed: topics.filter(t => Number(t.round_status) === 3).length,
+      stopped: topics.filter(t => Number(t.round_status) === 0).length,
+    };
+  }, [topics]);
 
   useEffect(() => {
     fetchTopics();
@@ -157,6 +168,7 @@ const FacultyTopicManagement = () => {
   const handleAssignCouncil = async (values) => {
     try {
       await api.post(`/topics/${assigningTopic.id}/assign`, { council_members: values.council_members });
+      await topicService.updateTopicStatus(assigningTopic.id, { status: 'grading' });
       message.success('Phân công giám khảo thành công!');
       setIsAssignModalVisible(false);
       fetchTopics();
@@ -171,7 +183,17 @@ const FacultyTopicManagement = () => {
 
   const resetFilters = () => {
     filterForm.resetFields();
+    setRoundStatusFilter('all');
     fetchTopics();
+  };
+
+  const filteredTopicsForTable = useMemo(() => {
+    if (roundStatusFilter === 'all') return topics;
+    return topics.filter(t => Number(t.round_status) === roundStatusFilter);
+  }, [topics, roundStatusFilter]);
+
+  const handleTagClick = (round) => {
+    setRoundStatusFilter(prev => prev === round ? 'all' : round);
   };
 
   // Hàm xử lý xuất dữ liệu ra file Word (.doc)
@@ -259,11 +281,11 @@ const FacultyTopicManagement = () => {
   };
 
   const columns = [
-    { title: 'Tên đề tài', dataIndex: 'title', key: 'title', width: '25%', render: text => <strong>{text}</strong> },
+    { title: 'Tên đề tài', dataIndex: 'title', key: 'title', width: 280, render: text => <strong style={{ display: 'block', whiteSpace: 'normal', minWidth: 200 }}>{text}</strong> },
     { 
       title: 'Nhóm thực hiện', 
       key: 'student_info', 
-      width: '20%',
+      width: 240,
       render: (_, record) => (
         <Text><strong>Nhóm trưởng:</strong> {record.student_name}<br/>
         {record.team_members && (() => {
@@ -277,11 +299,12 @@ const FacultyTopicManagement = () => {
           })()}</Text>
       )
     },
-    { title: 'Khoa', dataIndex: 'faculty_name', key: 'faculty_name', width: '15%', render: faculty => faculty || <Tag>Chưa có</Tag> },
-    { title: 'Giảng viên hướng dẫn', dataIndex: 'instructor_name', key: 'instructor_name', width: '15%', render: text => text ? <Text strong>{text}</Text> : <Tag>Chưa có</Tag> },
-    { title: 'Chuyên ngành', dataIndex: 'major', key: 'major', width: '15%', render: major => major || <Tag>Chưa có</Tag> },
+    { title: 'Khoa', dataIndex: 'faculty_name', key: 'faculty_name', width: 160, render: faculty => faculty ? <span style={{ fontSize: '12px' }}>{faculty}</span> : <Tag>Chưa có</Tag> },
+    { title: 'GVHD', dataIndex: 'instructor_name', key: 'instructor_name', width: 160, render: text => text ? <Text strong>{text}</Text> : <Tag>Chưa có</Tag> },
+    { title: 'Chuyên ngành', dataIndex: 'major', key: 'major', width: 160, render: major => major ? <span style={{ fontSize: '12px' }}>{major}</span> : <Tag>Chưa có</Tag> },
     { 
-      title: 'Kinh phí', dataIndex: 'funding', key: 'funding', width: '10%',
+      title: 'Kinh phí', dataIndex: 'funding', key: 'funding', width: 140,
+      align: 'right',
       render: (funding, record) => {
         if (!funding) return <Text type="secondary">Chưa cấp</Text>;
         const statusMap = {
@@ -292,15 +315,16 @@ const FacultyTopicManagement = () => {
         };
         const s = statusMap[record.funding_status] || statusMap.pending;
         return (
-          <Space direction="vertical" size="small">
-            <Text type="success">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(funding)}</Text>
-            <Tag color={s.color}>{s.text}</Tag>
-          </Space>
+          <div style={{ textAlign: 'right', lineHeight: '24px' }}>
+            <Text type="success" strong>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(funding)}</Text><br />
+            <Tag color={s.color} style={{ marginRight: 0 }}>{s.text}</Tag>
+          </div>
         );
       }
     },
     { 
-      title: 'Vòng thi', dataIndex: 'round_status', key: 'round_status', width: '10%',
+      title: 'Vòng thi', dataIndex: 'round_status', key: 'round_status', width: 120,
+      align: 'center',
       render: round => {
         if (round === 1) return <Tag color="magenta">VÒNG KHOA</Tag>;
         if (round === 2) return <Tag color="geekblue">VÒNG TRƯỜNG</Tag>;
@@ -310,26 +334,38 @@ const FacultyTopicManagement = () => {
       }
     },
     {
-      title: 'Điểm TB',
+      title: 'Điểm',
       dataIndex: 'average_score',
       key: 'average_score',
-      width: '8%',
+      width: 90,
+      align: 'center',
       render: (score, record) => {
         if (record.status === 'approved') return <Text type="secondary">Chưa có</Text>;
-        return score ? <Tag color="purple"><b>{parseFloat(score).toFixed(2)}</b></Tag> : <Text type="secondary">Chưa có</Text>;
+        return score != null ? <Tag color="purple"><b>{parseFloat(score).toFixed(2)}</b></Tag> : <Text type="secondary">Chưa có</Text>;
       },
     },
-    { title: 'Trạng thái hồ sơ', dataIndex: 'status', key: 'status', width: '15%', render: renderStatusTag },
+    { title: 'Trạng thái', dataIndex: 'status', key: 'status', width: 150, align: 'center', render: renderStatusTag },
     {
       title: 'Hành động', key: 'action',
+      fixed: 'right',
+      width: 220,
+      align: 'center',
       render: (_, record) => (
-        <Space size="small" wrap>
-          <Button type="dashed" icon={<EditOutlined />} onClick={() => showUpdateModal(record)}>
-            Cập nhật & Kinh phí
+        <Space direction="horizontal" size="small">
+          <Button size="small" type="dashed" icon={<EditOutlined />} onClick={() => showUpdateModal(record)} style={{ fontSize: '12px' }}>
+            Sửa
           </Button>
           {/* Cho phép phân công khi đề tài đã được duyệt hoặc đang chấm (để sửa) */}
-          <Button type="primary" ghost icon={<TeamOutlined />} onClick={() => showAssignModal(record)} disabled={!['approved', 'grading'].includes(record.status)}>
-            Phân công
+            <Button 
+              size="small" 
+              type={record.status === 'grading' ? "default" : "primary"} 
+              ghost={record.status !== 'grading'} 
+              icon={<TeamOutlined />} 
+              onClick={() => showAssignModal(record)} 
+              disabled={!['approved', 'grading'].includes(record.status)} 
+              style={{ fontSize: '12px', ...(record.status === 'grading' ? { color: '#52c41a', borderColor: '#52c41a', backgroundColor: '#f6ffed' } : {}) }}
+            >
+              {record.status === 'grading' ? 'Đã phân công' : 'Phân công'}
           </Button>
         </Space>
       )
@@ -347,36 +383,79 @@ const FacultyTopicManagement = () => {
 
       <Form
         form={filterForm}
-        layout="inline"
+        layout="vertical"
         onFinish={handleFilter}
         style={{ marginBottom: 24, background: '#fafafa', padding: '16px', borderRadius: '8px' }}
       >
-        <Form.Item name="campaign_id" label="Lọc theo Đợt thi">
-          <Select allowClear placeholder="Tất cả các đợt thi" style={{ width: 220 }} showSearch optionFilterProp="children">
-            {campaigns.map(campaign => (
-              <Option key={campaign.id} value={campaign.id}>
-                {campaign.name} ({campaign.academic_year})
-              </Option>
-            ))}
-          </Select>
-        </Form.Item>
-        <Form.Item name="faculty" label="Lọc theo Khoa">
-          <Select allowClear placeholder="Tất cả các khoa" style={{ width: 220 }}>
-            {Object.keys(FACULTY_MAJORS).map(faculty => (
-              <Option key={faculty} value={faculty}>{faculty}</Option>
-            ))}
-          </Select>
-        </Form.Item>
-        <Form.Item name="dateRange" label="Lọc theo ngày nộp">
-          <DatePicker.RangePicker />
-        </Form.Item>
-        <Form.Item>
-          <Button type="primary" htmlType="submit">Lọc</Button>
-          <Button style={{ marginLeft: 8 }} onClick={resetFilters}>Xóa bộ lọc</Button>
-        </Form.Item>
+        <Row gutter={[16, 16]} align="bottom">
+          <Col xs={24} sm={12} md={6}>
+            <Form.Item name="campaign_id" label="Lọc theo Đợt thi" style={{ marginBottom: 0 }}>
+              <Select allowClear placeholder="Tất cả các đợt thi" showSearch optionFilterProp="children">
+                {campaigns.map(campaign => (
+                  <Option key={campaign.id} value={campaign.id}>
+                    {campaign.name} ({campaign.academic_year})
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Form.Item name="faculty" label="Lọc theo Khoa" style={{ marginBottom: 0 }}>
+              <Select allowClear placeholder="Tất cả các khoa">
+                {Object.keys(FACULTY_MAJORS).map(faculty => (
+                  <Option key={faculty} value={faculty}>{faculty}</Option>
+                ))}
+              </Select>
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Form.Item name="dateRange" label="Lọc theo ngày nộp" style={{ marginBottom: 0 }}>
+              <DatePicker.RangePicker style={{ width: '100%' }} />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Form.Item style={{ marginBottom: 0 }}>
+              <Space>
+                <Button type="primary" htmlType="submit">Lọc</Button>
+                <Button onClick={resetFilters}>Xóa bộ lọc</Button>
+              </Space>
+            </Form.Item>
+          </Col>
+        </Row>
       </Form>
 
-      <Table columns={columns} dataSource={topics} loading={loading} pagination={{ pageSize: 10 }} bordered scroll={{ x: 'max-content' }} />
+      <Space size="middle" wrap style={{ marginBottom: 16 }}>
+        <Tag 
+          color="magenta" 
+          style={{ padding: '4px 12px', fontSize: '14px', borderRadius: '16px', cursor: 'pointer', transition: 'opacity 0.3s', opacity: roundStatusFilter !== 'all' && roundStatusFilter !== 1 ? 0.4 : 1 }}
+          onClick={() => handleTagClick(1)}
+        >
+          Vòng Khoa: {topicStats.round1}
+        </Tag>
+        <Tag 
+          color="geekblue" 
+          style={{ padding: '4px 12px', fontSize: '14px', borderRadius: '16px', cursor: 'pointer', transition: 'opacity 0.3s', opacity: roundStatusFilter !== 'all' && roundStatusFilter !== 2 ? 0.4 : 1 }}
+          onClick={() => handleTagClick(2)}
+        >
+          Vòng Trường: {topicStats.round2}
+        </Tag>
+        <Tag 
+          color="gold" 
+          style={{ padding: '4px 12px', fontSize: '14px', borderRadius: '16px', cursor: 'pointer', transition: 'opacity 0.3s', opacity: roundStatusFilter !== 'all' && roundStatusFilter !== 3 ? 0.4 : 1 }}
+          onClick={() => handleTagClick(3)}
+        >
+          Hoàn thành: {topicStats.completed}
+        </Tag>
+        <Tag 
+          color="default" 
+          style={{ padding: '4px 12px', fontSize: '14px', borderRadius: '16px', cursor: 'pointer', transition: 'opacity 0.3s', opacity: roundStatusFilter !== 'all' && roundStatusFilter !== 0 ? 0.4 : 1 }}
+          onClick={() => handleTagClick(0)}
+        >
+          Dừng ở Khoa: {topicStats.stopped}
+        </Tag>
+      </Space>
+
+      <Table size="small" columns={columns} dataSource={filteredTopicsForTable} loading={loading} pagination={{ pageSize: 10 }} bordered scroll={{ x: 'max-content' }} />
       
       <Modal title={`Cập nhật thông tin & Kinh phí: ${editingTopic?.title}`} open={isModalVisible} onCancel={() => setIsModalVisible(false)} onOk={() => form.submit()} okText="Lưu thay đổi" cancelText="Hủy">
         <Form form={form} layout="vertical" onFinish={handleUpdateProgress}>

@@ -16,7 +16,7 @@ const simulatedUsers = [
   { id: 2, full_name: 'Chuyên Viên', email: 'chuyenvien@truong.vn', password: 'will_be_hashed', role: 'specialist', faculty_name: 'Khoa Công nghệ và Kỹ thuật' },
   { id: 3, full_name: 'Giảng Viên', email: 'giangvien@truong.vn', password: 'will_be_hashed', role: 'instructor', faculty_name: 'Khoa Kinh tế và Quản trị' },
   { id: 4, full_name: 'Sinh Viên', email: 'sinhvien@truong.vn', password: 'will_be_hashed', role: 'student', faculty_name: 'Khoa Luật' },
-  { id: 5, full_name: 'Hội Đồng', email: 'hoidong@truong.vn', password: 'will_be_hashed', role: 'council', faculty_name: 'Khoa Khoa học Cơ bản' }
+  { id: 5, full_name: 'Thư ký Hội đồng', email: 'hoidong@truong.vn', password: 'will_be_hashed', role: 'council', faculty_name: 'Khoa Khoa học Cơ bản' }
 ];
 
 const jwtSecret = 'your_default_secret_key';

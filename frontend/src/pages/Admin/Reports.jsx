@@ -1,5 +1,5 @@
 import { EyeOutlined } from '@ant-design/icons';
-import { Button, Card, Form, Input, message, Modal, Popconfirm, Select, Table, Tag, Typography } from 'antd';
+import { Button, Card, Form, Input, message, Modal, Popconfirm, Select, Space, Table, Tag, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import api from '../../services/api';
 
@@ -85,7 +85,10 @@ const Reports = () => {
       else if (response?.data && Array.isArray(response.data)) topicsData = response.data;
       else if (response?.data?.data && Array.isArray(response.data.data)) topicsData = response.data.data;
 
-      setTopics(topicsData.map(t => ({ ...t, key: t.id })));
+      // Lọc: Chỉ lấy các đề tài lọt vào Vòng Trường (round_status = 2) hoặc đã Hoàn thành (round_status = 3)
+      const filteredTopics = topicsData.filter(t => t.round_status >= 2);
+
+      setTopics(filteredTopics.map(t => ({ ...t, key: t.id })));
     } catch (error) {
       message.error('Không thể tải danh sách đề tài cho đợt thi này.');
     } finally {
@@ -110,9 +113,16 @@ const Reports = () => {
 
       if (index > -1) {
         const item = newData[index];
-        await api.patch(`/topics/${item.id}/status`, { award: row.award, effectiveness: row.effectiveness });
+        // Khi cập nhật giải thưởng, tự động đánh dấu đề tài là Hoàn thành (Nghiệm thu)
+        const updatePayload = { 
+          award: row.award, 
+          effectiveness: row.effectiveness,
+          status: 'completed',
+          round_status: 3
+        };
+        await api.patch(`/topics/${item.id}/status`, updatePayload);
         
-        newData.splice(index, 1, { ...item, ...row });
+        newData.splice(index, 1, { ...item, ...row, ...updatePayload });
         setTopics(newData);
         setEditingKey('');
         message.success('Đã cập nhật giải thưởng!');
@@ -160,7 +170,12 @@ const Reports = () => {
 
       setTopicsLoading(true);
       for (const update of updates) {
-        await api.patch(`/topics/${update.id}/status`, { award: update.award, effectiveness: update.effectiveness });
+        await api.patch(`/topics/${update.id}/status`, { 
+          award: update.award, 
+          effectiveness: update.effectiveness,
+          status: 'completed',
+          round_status: 3
+        });
       }
       
       message.success(`Đã tự động xét giải cho ${updates.length} đề tài!`);
@@ -173,22 +188,29 @@ const Reports = () => {
   };
 
   const columns = [
-    { title: 'Tên đề tài', dataIndex: 'title', key: 'title', width: '25%' },
-    { title: 'Sinh viên', dataIndex: 'student_name', key: 'student_name' },
-    { title: 'GVHD', dataIndex: 'instructor_name', key: 'instructor_name' },
+    { title: 'Tên đề tài', dataIndex: 'title', key: 'title', width: 250 },
+    { title: 'Sinh viên', dataIndex: 'student_name', key: 'student_name', width: 160 },
+    { title: 'GVHD', dataIndex: 'instructor_name', key: 'instructor_name', width: 160 },
     {
       title: 'Điểm TB',
       dataIndex: 'average_score',
       key: 'average_score',
-      width: '10%',
-      render: (score) => score ? <Tag color="purple"><b>{parseFloat(score).toFixed(2)}</b></Tag> : <Tag>Chưa chấm</Tag>,
-      sorter: (a, b) => (a.average_score || 0) - (b.average_score || 0),
+      width: 100,
+      render: (score) => score != null ? <Tag color="purple"><b>{parseFloat(score).toFixed(2)}</b></Tag> : <Tag>Chưa chấm</Tag>,
+      sorter: (a, b) => {
+        const getPriority = (t) => t.status === 'rejected' ? -1 : (t.round_status != null ? t.round_status : 1);
+        const pA = getPriority(a);
+        const pB = getPriority(b);
+        if (pA !== pB) return pA - pB;
+        return (parseFloat(a.average_score) || 0) - (parseFloat(b.average_score) || 0);
+      },
       defaultSortOrder: 'descend',
     },
     {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
+      width: 160,
       render: (status, record) => {
         const statusMap = {
           pending: { color: 'orange', text: 'Chờ duyệt' },
@@ -199,6 +221,11 @@ const Reports = () => {
           completed: { color: 'gold', text: 'Đã nghiệm thu' },
           rejected: { color: 'red', text: 'Bị từ chối' },
         };
+        
+        if (status === 'grading' && record.average_score != null) {
+          return <Tag color="geekblue">ĐÃ CHẤM</Tag>;
+        }
+        
         const { color, text } = statusMap[status] || { color: 'default', text: status };
         return <Tag color={color}>{text.toUpperCase()}</Tag>;
       }
@@ -208,7 +235,7 @@ const Reports = () => {
       dataIndex: 'award',
       key: 'award',
       editable: true,
-      width: '15%',
+      width: 180,
       render: (text) => text || <span style={{color: 'gray'}}>Chưa có</span>
     },
     {
@@ -216,40 +243,44 @@ const Reports = () => {
       dataIndex: 'effectiveness',
       key: 'effectiveness',
       editable: true,
-      width: '20%',
+      width: 200,
       render: (text) => text || <span style={{color: 'gray'}}>Chưa có</span>
     },
     {
       title: 'Hành động',
       dataIndex: 'operation',
+      fixed: 'right',
+      width: 160,
       render: (_, record) => {
         const editable = isEditing(record);
         return editable ? (
-          <span>
-            <Button onClick={() => save(record.key)} type="primary" style={{ marginRight: 8 }}>Lưu</Button>
-            <Popconfirm title="Bạn chắc chắn muốn hủy?" onConfirm={cancel}><Button>Hủy</Button></Popconfirm>
-          </span>
+          <Space size="small">
+            <Button size="small" onClick={() => save(record.key)} type="primary">Lưu</Button>
+            <Popconfirm title="Bạn chắc chắn muốn hủy?" onConfirm={cancel}><Button size="small">Hủy</Button></Popconfirm>
+          </Space>
         ) : (
-          <Button disabled={editingKey !== ''} onClick={() => edit(record)}>Cập nhật giải</Button>
+          <Button size="small" disabled={editingKey !== ''} onClick={() => edit(record)}>Cập nhật giải</Button>
         );
       },
     },
   ];
 
   const campaignColumns = [
-    { title: 'Tên đợt thi', dataIndex: 'name', key: 'name', render: text => <strong>{text}</strong> },
-    { title: 'Năm Học', dataIndex: 'academic_year', key: 'academic_year' },
-    { title: 'Bắt đầu', dataIndex: 'start_date', key: 'start_date', render: date => date ? new Date(date).toLocaleDateString('vi-VN') : '' },
-    { title: 'Kết thúc', dataIndex: 'end_date', key: 'end_date', render: date => date ? new Date(date).toLocaleDateString('vi-VN') : '' },
+    { title: 'Tên đợt thi', dataIndex: 'name', key: 'name', width: 250, render: text => <strong>{text}</strong> },
+    { title: 'Năm Học', dataIndex: 'academic_year', key: 'academic_year', width: 120 },
+    { title: 'Bắt đầu', dataIndex: 'start_date', key: 'start_date', width: 120, render: date => date ? new Date(date).toLocaleDateString('vi-VN') : '' },
+    { title: 'Kết thúc', dataIndex: 'end_date', key: 'end_date', width: 120, render: date => date ? new Date(date).toLocaleDateString('vi-VN') : '' },
     {
-      title: 'Trạng thái', dataIndex: 'status', key: 'status',
+      title: 'Trạng thái', dataIndex: 'status', key: 'status', width: 130,
       render: status => <Tag color={status === 'active' ? 'green' : 'red'}>{status === 'active' ? 'ĐANG MỞ' : 'ĐÃ ĐÓNG'}</Tag>
     },
     {
       title: 'Hành động',
       key: 'action',
+      fixed: 'right',
+      width: 220,
       render: (_, record) => (
-        <Button icon={<EyeOutlined />} onClick={() => handleViewAwards(record)}>
+        <Button size="small" icon={<EyeOutlined />} onClick={() => handleViewAwards(record)}>
           Xem chi tiết & Giải thưởng
         </Button>
       ),
@@ -269,11 +300,13 @@ const Reports = () => {
       <Title level={3} style={{ marginBottom: 24, color: '#1890ff' }}>Thống kê & Báo cáo Giải thưởng</Title>
       
       <Table
+        size="small"
         columns={campaignColumns}
         dataSource={campaigns}
         loading={loading}
         pagination={{ pageSize: 10 }}
         bordered
+        scroll={{ x: 'max-content' }}
       />
 
       <Modal
@@ -293,6 +326,7 @@ const Reports = () => {
       >
         <Form form={form} component={false}>
           <Table
+            size="small"
             components={{ body: { cell: EditableCell } }}
             bordered
             dataSource={topics}

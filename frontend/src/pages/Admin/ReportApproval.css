@@ -7,7 +7,7 @@
 }
 
 .report-approval-container h1 {
-  color: #333;
+  color: #3c3b3b;
   margin-bottom: 2rem;
   text-align: center;
   font-size: 2rem;
@@ -68,7 +68,7 @@
 }
 
 .report-row:hover {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 16px rgba(255, 255, 255, 0.15);
 }
 
 @media (max-width: 1024px) {

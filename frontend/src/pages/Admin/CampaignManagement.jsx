@@ -1,8 +1,9 @@
-import { EyeOutlined, MinusCircleOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
-import { Button, Card, Col, DatePicker, Divider, Drawer, Form, Input, InputNumber, List, message, Modal, Popconfirm, Row, Select, Space, Spin, Statistic, Table, Tag, Typography } from 'antd';
+import { CloseOutlined, DeleteOutlined, EditOutlined, MinusCircleOutlined, PlusOutlined, PrinterOutlined, SearchOutlined } from '@ant-design/icons';
+import { Button, Card, Col, DatePicker, Divider, Form, Input, InputNumber, message, Modal, Popconfirm, Row, Select, Space, Spin, Table, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { campaignService } from '../../services/campaignService';
+import { topicService } from '../../services/topicService';
 import TopicManagement from './TopicManagement';
 
 const { Title, Text } = Typography;
@@ -67,6 +68,7 @@ const CampaignManagement = () => {
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [campaignStats, setCampaignStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     fetchCampaigns();
@@ -146,6 +148,90 @@ const CampaignManagement = () => {
     }
   };
 
+  const handleExportReport = async () => {
+    if (!selectedCampaign) return;
+    setIsExporting(true);
+    try {
+      const response = await topicService.getAllTopics({ campaign_id: selectedCampaign.id });
+      let topicsData = [];
+      if (Array.isArray(response)) topicsData = response;
+      else if (response?.data && Array.isArray(response.data)) topicsData = response.data;
+      else if (response?.data?.data && Array.isArray(response.data.data)) topicsData = response.data.data;
+
+      if (topicsData.length === 0) {
+        message.warning('Không có dữ liệu để xuất báo cáo!');
+        return;
+      }
+
+      const statusMap = {
+        pending: 'Chờ duyệt', instructor_approved: 'GVHD đã duyệt', approved: 'Đã duyệt',
+        grading: 'Đang chấm', revision_requested: 'Yêu cầu sửa', completed: 'Hoàn thành', rejected: 'Từ chối'
+      };
+      const roundMap = { 1: 'Vòng Khoa', 2: 'Vòng Trường', 3: 'Hoàn thành', 0: 'Dừng ở Khoa' };
+
+      let tableRows = '';
+      topicsData.forEach((t, index) => {
+        tableRows += `
+          <tr>
+            <td style="border: 1px solid black; padding: 5px; text-align: center;">${index + 1}</td>
+            <td style="border: 1px solid black; padding: 5px;">${t.title || ''}</td>
+            <td style="border: 1px solid black; padding: 5px;">${t.student_name || ''} (${t.student_code || ''})</td>
+            <td style="border: 1px solid black; padding: 5px;">${t.faculty_name || ''}</td>
+            <td style="border: 1px solid black; padding: 5px;">${t.instructor_name || ''}</td>
+            <td style="border: 1px solid black; padding: 5px; text-align: center;">${roundMap[t.round_status] || ''}</td>
+            <td style="border: 1px solid black; padding: 5px; text-align: center;">${statusMap[t.status] || t.status}</td>
+            <td style="border: 1px solid black; padding: 5px; text-align: center;">${t.average_score ? parseFloat(t.average_score).toFixed(2) : ''}</td>
+          </tr>
+        `;
+      });
+
+      const htmlContent = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta charset="utf-8">
+          <title>Export Word</title>
+          <style>
+            body { font-family: 'Times New Roman', serif; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { border: 1px solid black; padding: 8px; background-color: #f2f2f2; font-weight: bold; text-align: center; }
+            h2 { text-align: center; font-size: 24px; text-transform: uppercase; }
+            p.date { text-align: right; font-style: italic; }
+          </style>
+        </head>
+        <body>
+          <h2>BÁO CÁO DANH SÁCH ĐỀ TÀI: ${selectedCampaign.name}</h2>
+          <p class="date">Ngày xuất báo cáo: ${new Date().toLocaleDateString('vi-VN')}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>STT</th><th>Tên Đề Tài</th><th>Sinh Viên TH</th><th>Khoa</th>
+                <th>GV Hướng Dẫn</th><th>Vòng Thi</th><th>Trạng Thái</th><th>Điểm TB</th>
+              </tr>
+            </thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Bao_Cao_De_Tai_${selectedCampaign.id}_${new Date().toISOString().slice(0, 10)}.doc`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      message.success('Xuất báo cáo thành công!');
+    } catch (error) {
+      message.error('Lỗi khi xuất báo cáo!');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const showDetails = async (record) => {
     setSelectedCampaign(record);
     setDetailsVisible(true);
@@ -161,23 +247,23 @@ const CampaignManagement = () => {
   };
 
   const columns = [
-    { title: 'Tên Đợt Thi', dataIndex: 'name', key: 'name', render: text => <strong>{text}</strong> },
-    { title: 'Năm Học', dataIndex: 'academic_year', key: 'academic_year' },
-    { title: 'Bắt đầu', dataIndex: 'start_date', key: 'start_date', render: date => date ? new Date(date).toLocaleDateString('vi-VN') : '' },
-    { title: 'Kết thúc', dataIndex: 'end_date', key: 'end_date', render: date => date ? new Date(date).toLocaleDateString('vi-VN') : '' },
+    { title: 'Tên Đợt Thi', dataIndex: 'name', key: 'name', width: 250, render: text => <strong>{text}</strong> },
+    { title: 'Năm Học', dataIndex: 'academic_year', key: 'academic_year', width: 120 },
+    { title: 'Bắt đầu', dataIndex: 'start_date', key: 'start_date', width: 120, render: date => date ? new Date(date).toLocaleDateString('vi-VN') : '' },
+    { title: 'Kết thúc', dataIndex: 'end_date', key: 'end_date', width: 120, render: date => date ? new Date(date).toLocaleDateString('vi-VN') : '' },
     {
-      title: 'Trạng thái', dataIndex: 'status', key: 'status',
+      title: 'Trạng thái', dataIndex: 'status', key: 'status', width: 130,
       render: status => <Tag color={status === 'active' ? 'green' : 'red'}>{status === 'active' ? 'ĐANG MỞ' : 'ĐÃ ĐÓNG'}</Tag>
     },
     {
-      title: 'Hành động', key: 'action',
+      title: 'Hành động', key: 'action', fixed: 'right', width: 240, align: 'center',
       render: (_, record) => (
-        <Space>
-          <Button icon={<EyeOutlined />} onClick={() => showDetails(record)} type="default">Chi tiết</Button>
-          {canManage && <Button onClick={() => showModal(record)}>Sửa</Button>}
+        <Space direction="horizontal" size="small">
+          <Button size="small" icon={<SearchOutlined />} onClick={() => showDetails(record)} type="default" style={{ fontSize: '12px' }}>Chi tiết</Button>
+          {canManage && <Button size="small" icon={<EditOutlined />} onClick={() => showModal(record)} style={{ fontSize: '12px' }}>Sửa</Button>}
           {canManage && (
             <Popconfirm title="Bạn có chắc muốn xóa đợt thi này?" onConfirm={() => handleDelete(record.id)} okText="Xóa" cancelText="Hủy">
-              <Button danger>Xóa</Button>
+              <Button size="small" danger icon={<DeleteOutlined />} style={{ fontSize: '12px' }}>Xóa</Button>
             </Popconfirm>
           )}
         </Space>
@@ -219,24 +305,29 @@ const CampaignManagement = () => {
         )}
       </div>
 
-      <Space style={{ marginBottom: 16 }}>
-        <Input
-          placeholder="Tìm kiếm theo tên, năm học..."
-          prefix={<SearchOutlined />}
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          style={{ width: 300 }}
-          allowClear
-        />
-        <DatePicker.RangePicker
-          placeholder={['Từ ngày', 'Đến ngày']}
-          onChange={(dates) => setFilterDates(dates)}
-          style={{ width: 300 }}
-          allowClear
-        />
-      </Space>
+      <div style={{ background: '#fafafa', padding: '16px', borderRadius: '8px', marginBottom: 24 }}>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={12} md={10}>
+            <Input
+              placeholder="Tìm kiếm theo tên, năm học..."
+              prefix={<SearchOutlined />}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              allowClear
+            />
+          </Col>
+          <Col xs={24} sm={12} md={10}>
+            <DatePicker.RangePicker
+              placeholder={['Từ ngày', 'Đến ngày']}
+              onChange={(dates) => setFilterDates(dates)}
+              style={{ width: '100%' }}
+              allowClear
+            />
+          </Col>
+        </Row>
+      </div>
 
-      <Table columns={columns} dataSource={filteredCampaigns} loading={loading} pagination={{ pageSize: 10 }} bordered scroll={{ x: 'max-content' }} />
+      <Table size="small" columns={columns} dataSource={filteredCampaigns} loading={loading} pagination={{ pageSize: 10 }} bordered scroll={{ x: 'max-content' }} />
       
       <Modal title={editingId ? "Cập nhật đợt thi" : "Tạo đợt thi mới"} open={isModalVisible} onCancel={() => setIsModalVisible(false)} onOk={() => form.submit()} okText="Lưu" cancelText="Hủy" confirmLoading={submitLoading}>
         <Form form={form} layout="vertical" onFinish={handleSave}>
@@ -281,61 +372,84 @@ const CampaignManagement = () => {
         </Form>
       </Modal>
 
-      <Drawer
-        title={<span style={{ fontSize: 18 }}>Chi tiết Đợt thi: {selectedCampaign?.name}</span>}
-        width="100vw"
-        placement="right"
-        onClose={() => setDetailsVisible(false)}
+      <Modal
         open={detailsVisible}
+        onCancel={() => setDetailsVisible(false)}
+        width={1200}
+        style={{ top: 30 }}
+        closable={false}
+        footer={null}
+        bodyStyle={{ padding: '20px', minHeight: '60vh', maxHeight: '85vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}
       >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <Title level={4} style={{ margin: 0 }}>
+            Chi tiết Đợt thi: {selectedCampaign?.name}
+          </Title>
+          <Button type="text" icon={<CloseOutlined style={{ fontSize: '20px' }} />} onClick={() => setDetailsVisible(false)} />
+        </div>
+
         {statsLoading ? (
-          <div style={{ textAlign: 'center', padding: '50px' }}><Spin size="large" /></div>
+          <div style={{ textAlign: 'center', padding: '50px', flexGrow: 1 }}><Spin size="large" /></div>
         ) : campaignStats ? (
-          <div>
-            <Row gutter={[16, 16]}>
-              <Col span={8}>
-                <Card size="small" bordered={false} style={{ background: '#f0f2f5' }}>
-                  <Statistic title="Tổng số đề tài" value={campaignStats.topics?.length || 0} />
-                </Card>
+          <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+            {/* Khối thẻ thống kê tổng quan */}
+            <Row gutter={[12, 12]} style={{ marginBottom: '12px' }}>
+              <Col xs={24} sm={8}>
+                <div style={{ background: '#f5f5f5', padding: '6px 12px', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#8c8c8c', fontSize: '13px' }}>Tổng số đề tài</span>
+                  <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#000' }}>{campaignStats.topics?.length || 0}</span>
+                </div>
               </Col>
-              <Col span={8}>
-                <Card size="small" bordered={false} style={{ background: '#f0f2f5' }}>
-                  <Statistic 
-                    title="Đề tài vòng Trường" 
-                    value={campaignStats.roundStats?.find(r => r.round_status === 2)?.count || 0} 
-                    valueStyle={{ color: '#cf1322' }} 
-                  />
-                </Card>
+              <Col xs={24} sm={8}>
+                <div style={{ background: '#f5f5f5', padding: '6px 12px', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#8c8c8c', fontSize: '13px' }}>Đề tài vòng Trường</span>
+                  <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#cf1322' }}>{campaignStats.roundStats?.find(r => r.round_status === 2)?.count || 0}</span>
+                </div>
               </Col>
-              <Col span={8}>
-                <Card size="small" bordered={false} style={{ background: '#f0f2f5' }}>
-                  <Statistic 
-                    title="Đề tài đã hoàn thành" 
-                    value={campaignStats.statusStats?.find(s => s.status === 'completed')?.count || 0} 
-                    valueStyle={{ color: '#3f8600' }} 
-                  />
-                </Card>
+              <Col xs={24} sm={8}>
+                <div style={{ background: '#f5f5f5', padding: '6px 12px', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#8c8c8c', fontSize: '13px' }}>Đề tài đã hoàn thành</span>
+                  <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#3f8600' }}>{campaignStats.statusStats?.find(s => s.status === 'completed')?.count || 0}</span>
+                </div>
               </Col>
             </Row>
 
-            <Divider orientation="left">Thống kê theo Khoa</Divider>
-            <List
-              grid={{ gutter: 16, column: 3 }}
-              dataSource={campaignStats.facultyStats || []}
-              renderItem={item => (
-                <List.Item key={item.faculty_name || 'unknown-faculty'}>
-                  <Card size="small" title={item.faculty_name || 'Chưa phân Khoa'}>{item.count} đề tài</Card>
-                </List.Item>
-              )}
-            />
+            <Divider style={{ margin: '8px 0' }} />
 
-            <Divider orientation="left">Quản lý đề tài tham gia</Divider>
-            <TopicManagement campaignId={selectedCampaign.id} />
+            {/* Khối thống kê theo khoa */}
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#595959', marginBottom: '8px' }}>Thống kê theo Khoa:</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {(campaignStats.facultyStats || []).map(item => (
+                  <div key={item.faculty_name || 'unknown-faculty'} style={{ background: '#fff', border: '1px solid #d9d9d9', padding: '2px 10px', borderRadius: '12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ color: '#595959' }}>{item.faculty_name || 'Chưa phân Khoa'}</span>
+                    <span style={{ color: '#1890ff', fontWeight: 'bold' }}>{item.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <Divider style={{ margin: '12px 0' }} />
+
+            {/* Quản lý đề tài */}
+            <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+              <TopicManagement campaignId={selectedCampaign.id} />
+            </div>
+
+            {/* Footer Buttons */}
+            <div style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid #f0f0f0', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <Button type="primary" icon={<PrinterOutlined />} style={{ background: '#1677ff' }} onClick={handleExportReport} loading={isExporting}>
+                In báo cáo
+              </Button>
+              <Button onClick={() => setDetailsVisible(false)}>
+                Đóng
+              </Button>
+            </div>
           </div>
         ) : (
           <Text type="danger">Không có dữ liệu thống kê!</Text>
         )}
-      </Drawer>
+      </Modal>
     </Card>
   );
 };

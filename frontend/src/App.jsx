@@ -51,7 +51,7 @@ const protectedRoutes = [
   { path: 'admin/campaigns', component: <CampaignManagement />, roles: ['director', 'specialist'] },
   { path: 'admin/users', component: <UserManagement />, roles: ['director', 'specialist'] },
   { path: 'admin/reports', component: <Reports />, roles: ['director', 'specialist'] },
-  { path: 'admin/report-approval', component: <ReportApproval />, roles: ['instructor'] },
+  { path: 'teacher/report-approval', component: <ReportApproval />, roles: ['instructor'] },
 ];
 
 const RoleBasedHome = () => {

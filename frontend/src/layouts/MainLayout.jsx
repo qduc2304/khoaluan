@@ -1,7 +1,9 @@
 import {
+  AppstoreOutlined,
   BarChartOutlined,
   CheckCircleOutlined,
   DashboardOutlined,
+  DatabaseOutlined,
   EditOutlined,
   FileAddOutlined,
   FileDoneOutlined,
@@ -11,13 +13,14 @@ import {
   ProjectOutlined,
   TeamOutlined,
   TrophyOutlined,
+  UploadOutlined,
   UserOutlined
 } from '@ant-design/icons';
-import { Avatar, Button, Dropdown, Layout, Menu, Typography, theme } from 'antd';
+import { Avatar, Button, ConfigProvider, Dropdown, Layout, Menu, Typography, theme } from 'antd';
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
-const { Header, Sider, Content } = Layout;
+const { Header, Sider, Content, Footer } = Layout;
 const { Title } = Typography;
 
 const MainLayout = () => {
@@ -30,14 +33,14 @@ const MainLayout = () => {
   const role = localStorage.getItem('userRole');
   const userName = localStorage.getItem('userName');
 
-  // Sáng tạo: Tự động đăng xuất nếu trạng thái đăng nhập không hợp lệ (mất role)
+  // Tự động đăng xuất nếu trạng thái đăng nhập không hợp lệ
   useEffect(() => {
     if (localStorage.getItem('accessToken') && !role) {
       handleLogout();
     }
   }, [role]);
 
-  // Nếu chưa có role, không render gì cả để chờ useEffect xử lý
+  // Nếu chưa có role, chờ useEffect xử lý
   if (!role) {
     return null;
   }
@@ -64,7 +67,7 @@ const MainLayout = () => {
     },
     {
       key: '/student/submit-report',
-      icon: <FileAddOutlined />,
+      icon: <UploadOutlined />,
       label: 'Nộp Báo Cáo',
       roles: ['student']
     },
@@ -85,7 +88,7 @@ const MainLayout = () => {
     // DÀNH CHO CHUYÊN VIÊN VÀ GIÁM ĐỐC
     {
       key: '/faculty/topics',
-      icon: <CheckCircleOutlined />,
+      icon: <AppstoreOutlined />,
       label: 'Quản lý đề tài tổng thể',
       roles: ['specialist', 'director']
     },
@@ -116,13 +119,12 @@ const MainLayout = () => {
     },
     {
       key: '/reports/viewer',
-      icon: <FileDoneOutlined />,
+      icon: <DatabaseOutlined />,
       label: 'Kho Báo Cáo',
       roles: ['student', 'instructor', 'specialist', 'director', 'council']
     }
-  ].filter(item => item.roles.includes(role)); // Cốt lõi của phân quyền: Tự động giấu Menu nếu không đúng quyền
-
-  // XỬ LÝ ĐĂNG XUẤT
+  ].filter(item => item.roles.includes(role));
+  
   const handleLogout = () => {
     localStorage.clear();
     navigate('/login');
@@ -133,13 +135,58 @@ const MainLayout = () => {
     { key: 'logout', icon: <LogoutOutlined />, label: 'Đăng xuất', danger: true, onClick: handleLogout }
   ];
 
-  return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider trigger={null} collapsible collapsed={collapsed} width={280} theme="light" style={{ boxShadow: '2px 0 8px 0 rgba(29,35,41,.05)', zIndex: 10 }}>
-        <div style={{ height: 80, margin: 16, background: 'rgba(24, 144, 255, 0.1)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 10px' }}>
-          <Title level={3} style={{ margin: 0, color: '#1890ff', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {collapsed ? 'NCKH' : 'Quản lý NCKH'}
-          </Title>
+ return (
+  <ConfigProvider 
+    theme={{ 
+      algorithm: theme.compactAlgorithm,
+      token: {
+        fontSize: 13,
+      }
+    }}
+  >
+    <Layout hasSider style={{ height: '100vh', width: '100%', overflow: 'hidden' }}>
+      <Sider 
+        trigger={null} 
+        collapsible 
+        collapsed={collapsed} 
+        width={200} 
+        theme="light" 
+        style={{ 
+          overflow: 'auto',
+          height: '100vh',
+          background: '#ffffff', 
+          boxShadow: '2px 0 8px 0 rgba(29,35,41,.05)', 
+          zIndex: 10 
+        }}
+      >
+        <div 
+          onClick={() => navigate('/')}
+          style={{ 
+            height: 56, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            padding: collapsed ? '4px 8px' : '8px 16px',
+            boxSizing: 'border-box',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          {/* FIX LỖI LOGO: Thêm borderRadius 50% để tự cắt góc viền đen vuông */}
+          <img 
+            src="/logo.png" 
+            alt="Logo Đại học Thái Bình" 
+            style={{ 
+              height: collapsed ? '26px' : '36px', 
+              width: collapsed ? '26px' : '36px',
+              maxWidth: '100%', 
+              objectFit: 'cover', 
+              display: 'block', 
+              transition: 'all 0.2s',
+              borderRadius: '60%',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+            }} 
+          />
         </div>
         <Menu
           theme="light"
@@ -147,27 +194,39 @@ const MainLayout = () => {
           selectedKeys={[location.pathname]}
           onClick={({ key }) => navigate(key)}
           items={menuItems}
-          style={{ fontSize: '16px', fontWeight: 500 }}
+          style={{ 
+            fontSize: '13px', 
+            fontWeight: 500, 
+            borderRight: 0, 
+            background: 'transparent',
+            marginTop: 10
+          }}
         />
       </Sider>
       
-      <Layout>
-        <Header style={{ height: 80, padding: '0 32px', background: colorBgContainer, display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 1px 4px rgba(0,21,41,.08)', zIndex: 1 }}>
-          <Button type="text" icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => setCollapsed(!collapsed)} style={{ fontSize: '22px', width: 80, height: 80 }} />
+      {/* FIX LỖI Ô TRỐNG: Đổi chiều cao Layout con thành 100% ăn theo Layout tổng */}
+      <Layout style={{ background: '#f0f2f5', display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Header style={{ height: 56, flexShrink: 0, padding: '0 16px', background: colorBgContainer, display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)', zIndex: 2 }}>
+          <Button type="text" icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => setCollapsed(!collapsed)} style={{ fontSize: '16px', width: 56, height: 56 }} />
           
-          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" arrow>
-            <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', borderRadius: 8, transition: 'background 0.3s' }} className="user-dropdown">
-              <Avatar size={48} style={{ backgroundColor: '#1890ff', fontSize: '20px' }} icon={<UserOutlined />}>{userName ? userName.charAt(0).toUpperCase() : ''}</Avatar>
-              <span style={{ fontWeight: 600, fontSize: '17px' }}>{userName || 'Người dùng'} <br/><span style={{ color: 'gray', fontSize: '13px', fontWeight: 400 }}>{role.toUpperCase()}</span></span>
+          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" arrow trigger={['click']}>
+            <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, padding: '4px 8px', borderRadius: 8, transition: 'all 0.3s' }} className="user-dropdown">
+              <Avatar size={32} style={{ backgroundColor: '#1890ff', fontSize: '14px' }} icon={<UserOutlined />}>{userName ? userName.charAt(0).toUpperCase() : ''}</Avatar>
+              <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.3' }}>
+                <span style={{ fontWeight: 600, fontSize: '13px' }}>{userName || 'Người dùng'}</span>
+                <span className="notranslate" style={{ color: '#9ca3af', fontSize: '11px', fontWeight: 400 }}>{role.toUpperCase()}</span>
+              </div>
             </div>
           </Dropdown>
         </Header>
         
-        <Content style={{ margin: '32px', padding: 32, minHeight: 280, background: colorBgContainer, borderRadius: borderRadiusLG, fontSize: '16px' }}>
+        <Content style={{ margin: '16px', flex: '1 1 auto', overflowY: 'auto' }}>
           <Outlet />
         </Content>
+
       </Layout>
     </Layout>
+  </ConfigProvider>
   );
 };
 
